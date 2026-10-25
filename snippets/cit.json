@@ -1,0 +1,225 @@
+{
+  "Program": {
+    "prefix": "main",
+    "body": [
+      "void main()",
+      "\t$0",
+      "end;",
+      "",
+      "return error.NoErr;"
+    ],
+    "description": "CIT program skeleton"
+  },
+  "If": {
+    "prefix": "if",
+    "body": [
+      "if (${1:condition}) do",
+      "\t$0",
+      "end;"
+    ],
+    "description": "if statement"
+  },
+  "If / else": {
+    "prefix": "ifelse",
+    "body": [
+      "if (${1:condition}) do",
+      "\t$2",
+      "else do",
+      "\t$0",
+      "end;"
+    ],
+    "description": "if / else"
+  },
+  "If / else if / else": {
+    "prefix": "ifelseif",
+    "body": [
+      "if (${1:condition}) do",
+      "\t$2",
+      "else if (${3:condition}) do",
+      "\t$4",
+      "else do",
+      "\t$0",
+      "end;"
+    ],
+    "description": "if / else if / else"
+  },
+  "For range": {
+    "prefix": "for",
+    "body": [
+      "for (default num ${1:i}, range = ${2:0}, ${3:10}) do",
+      "\t$0",
+      "end;"
+    ],
+    "description": "for loop over a range"
+  },
+  "Function": {
+    "prefix": "func",
+    "body": [
+      "func ${1:name}(${2:a, b}) do",
+      "\t$0",
+      "end;"
+    ],
+    "description": "function"
+  },
+  "Input": {
+    "prefix": "input",
+    "body": [
+      "default input ${1:name} = console.input(\"${2:Question? }\");"
+    ],
+    "description": "read user input"
+  },
+  "Print": {
+    "prefix": "write",
+    "body": [
+      "console.write(${1:\"text\"});"
+    ],
+    "description": "print"
+  },
+  "While": {
+    "prefix": "while",
+    "body": [
+      "while (${1:condition}) do",
+      "\t$0",
+      "end;"
+    ],
+    "description": "while loop"
+  },
+  "Class": {
+    "prefix": "class",
+    "body": [
+      "class ${1:Name}() do",
+      "\tfunc _init(${2:args}) do",
+      "\t\t$0",
+      "\tend;",
+      "end;"
+    ],
+    "description": "class with constructor"
+  },
+  "Class (inherits)": {
+    "prefix": "classinherit",
+    "body": [
+      "class ${1:Child}(${2:Parent}) do",
+      "\tfunc _init(${3:args}) do",
+      "\t\tsuper._init($4);",
+      "\t\t$0",
+      "\tend;",
+      "end;"
+    ],
+    "description": "class that inherits"
+  },
+  "Import ui": {
+    "prefix": "import",
+    "body": [
+      "import ui;"
+    ],
+    "description": "import the ui module"
+  },
+  "UI root": {
+    "prefix": "uiroot",
+    "body": [
+      "ui.root ${1:main}(name=\"${2:Body}\", title=\"${3:My App}\")",
+      "\tui ${4:my_button} -> ui.button(id=\"${5:Click}\") = \"${6:Click me!}\";",
+      "end;"
+    ],
+    "description": "ui root with a button"
+  },
+  "Clicked": {
+    "prefix": "clicked",
+    "body": [
+      "${1:my_button}.clicked(func ${2:click}()",
+      "\t$0",
+      "end);"
+    ],
+    "description": "button click handler"
+  },
+  "Wait": {
+    "prefix": "wait",
+    "body": [
+      "task.wait(${1:1});"
+    ],
+    "description": "wait seconds"
+  },
+  "List": {
+    "prefix": "array",
+    "body": [
+      "default list ${1:items} = [${2:1, 2, 3}];"
+    ],
+    "description": "array (changeable list)"
+  },
+  "Tuple": {
+    "prefix": "tuple",
+    "body": [
+      "default list ${1:items} = (${2:1, 2, 3});"
+    ],
+    "description": "tuple (cannot be changed)"
+  },
+  "Code output": {
+    "prefix": "codeoutput",
+    "body": [
+      "ui ${1:output} -> ui.codeOutput() = \"${2:Output}\";"
+    ],
+    "description": "ui element that shows console output"
+  },
+  "Closed": {
+    "prefix": "closed",
+    "body": [
+      "${1:main}.closed(func ${2:closing}()",
+      "\t$0",
+      "end);"
+    ],
+    "description": "runs when the UI window is closed"
+  },
+  "Task": {
+    "prefix": "task",
+    "body": [
+      "task ${1:name}() do",
+      "\t$0",
+      "\ttask.wait(${2:1});",
+      "end;"
+    ],
+    "description": "repeating task"
+  },
+  "Task start": {
+    "prefix": "taskstart",
+    "body": [
+      "task.start(${1:name}()) until task.repeated(${2:5});"
+    ],
+    "description": "start a task until it repeated n times"
+  },
+  "When": {
+    "prefix": "when",
+    "body": [
+      "when (${1:value}) do",
+      "\t(${2:condition}) >> ${3:statement};",
+      "\telse >> ${4:statement};",
+      "end;"
+    ],
+    "description": "when statement"
+  },
+  "Enum": {
+    "prefix": "enum",
+    "body": [
+      "default enum ${1:Name} do",
+      "\t${1:Name}.${2:First};",
+      "\t${1:Name}.${3:Second};",
+      "end;"
+    ],
+    "description": "enum"
+  },
+  "Raise": {
+    "prefix": "raise",
+    "body": [
+      "raise error.${1:ValueError} do",
+      "\t$0",
+      "end;"
+    ],
+    "description": "raise an error"
+  },
+  "Dictionary": {
+    "prefix": "dict",
+    "body": [
+      "default list ${1:info} = {${2:name}: ${3:\"Bob\"}, ${4:age}: ${5:32}};"
+    ],
+    "description": "dictionary"
+  }
+}

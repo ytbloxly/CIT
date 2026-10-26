@@ -80,3 +80,94 @@ end;
 
 * `break;`, `continue;`, `pass;` and `return;` / `return value;` (inside `func` and `task`; `return error.X;` still ends the program).
 * In a task: `continue;` skips to the next repetition, `break;` / `return;` stop the task.
+
+## Defaults, styling, inputs, switch and try (v0.6)
+
+```
+import ui;
+import ui-style;
+
+ui.root main(name="Body", title="Form" style-connect="styler()")
+    ui email -> ui.input(type="email" required) = "you@example.com";   # type, minLength, maxLength, required
+    ui send -> ui.button(id="Send", class="button") = "Send";
+end;
+
+ui.style styler()                                  # selectors: id.X  name.X  class.X  ui.<element>  uni
+    id.Send {
+        background-color = color("blue");          # color("name") rgb() rgba() hsl() hwb() hex("ff8800")
+        text-color = hsl(0, 0, 100);
+        border = px(2), solid, color("white");     # size, type, color
+        font-family = "Arial", sans-serif;
+        width = px(200);                           # px() per() vh() vw() pt() em() rem() cm() in()
+    };
+    ui.button, ui.h2 {};
+end;
+
+void main()
+    email.focus(func f() ... end);                 # inputs: focus, focusEnd, typed;  a && b && c.typed(...)
+    func add(a = 1, b) do                          # default values; add(a, 2) uses a's default
+        return a + b;
+    end;
+
+    switch (add(a, 2)) do                          # break; leaves the switch
+        case 3, 4 do
+            console.write("three or four");
+        end;
+        default do
+            console.write("other");
+        end;
+    end;
+
+    try do
+        default num x = 1 / 0;
+    catch (err) do                                 # except works the same as catch
+        console.write(f"{err.name}: {err.message}");
+    finally do
+        console.write("always");
+    end;
+end;
+```
+
+* Input properties: `.value` (typed text, can be set), `.placeholder`, `.valid`.
+* In `catch`, `err` has `.name`, `.message` and `.line`. `return error.X;` is an exit and is not caught.
+
+## States, math, sets, built-ins and strings (v0.7)
+
+```
+import ui;
+import ui-style;
+import math as m;                                 # math.pi works too
+
+ui.root main(title="App" style-connect="styler()")
+    ui my_button -> ui.button(id="Click") = "Click me!";
+end;
+
+ui.style styler()
+    id.Click { background-color = color("yellow"); display = flexbox; margin = px(8), px(16); border-corner = px(6); };
+    id.Click.hover() { transform = scale(1.1); };        # states: hover(), hoverEnd(), active(), clicked()
+    id.Click.active() { background-color = color("red"); };
+end;
+# more tags: display, margin, padding, border-corner, position, transform = translate(px(1), px(2)), rotate(10), scale(1.2), skew(5)
+
+void main()
+    my_button.hover(func h() ... end);                # events: hover, hoverEnd, active (+ clicked, focus, ...)
+
+    when (n) do
+        (n > 5) is console.write("big");              # `is` (>> still works)
+        else is console.write("small");
+    end;
+
+    default num r = math.sqrt(16);                    # ceiling floor trunc sqrt cbrt power log log10 sin cos tan degrees radians factorial gcd fabs
+    default list s = {1, 2, 2, 3};                    # set: add discard remove has clear | & - ^
+    default ? anything = Null;                        # optional: any type
+    console.write(type(s), len(s), max(3, 9), isinstance(b, Person), issubclass(Builder, Person));
+    list("abc");  set([1, 1]);  tuple([1, 2]);
+
+    default string str = "Hello";
+    str.toUpperCase();                                # as a statement it changes the variable
+    console.write(str.replace("L" => "l"));           # in an expression it only returns a new string
+end;
+```
+
+* String methods: `toUpperCase`, `toLowerCase`, `replace("old" => "new")`, `includes`, `startsWith`, `endsWith`, `substring(start, end)`.
+* `type()` gives `num`, `string`, `bool`, `Null`, `list`, `tuple`, `set`, `dict`, a class name or an enum name.

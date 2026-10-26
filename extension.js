@@ -127,6 +127,13 @@ function uiHtml(ui, nonce) {
     if (el.attrs.id !== undefined) a.push(`id="${esc(el.attrs.id)}"`);
     const cls = [isOut ? 'cit-code-output' : null, el.attrs.class].filter(Boolean).join(' ');
     if (cls) a.push(`class="${esc(cls)}"`);
+    if (el.kind === 'input') {
+      a.push(`type="${esc(el.attrs.type || 'text')}"`, `placeholder="${esc(el.text)}"`, `value="${esc(el.value)}"`);
+      if (el.attrs.minLength !== undefined) a.push(`minlength="${esc(el.attrs.minLength)}"`);
+      if (el.attrs.maxLength !== undefined) a.push(`maxlength="${esc(el.attrs.maxLength)}"`);
+      if (el.attrs.required !== undefined && el.attrs.required !== 'False') a.push('required');
+      return `<input ${a.join(' ')}>`;
+    }
     let content = el.text;
     if (isOut) {
       if (el.log.length) content = el.log.join('\n'); else a.push('data-placeholder="1"');
@@ -135,25 +142,50 @@ function uiHtml(ui, nonce) {
     return `<${tag} ${a.join(' ')}>${esc(content)}</${tag}>`;
   }).join('\n');
   const rootId = ui.attrs.name !== undefined ? ui.attrs.name : ui.name;
+  // ui.css only contains validated tokens (see compileStyleProp in cit-core.js)
   return `<!DOCTYPE html><html><head><meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
 <style>
   body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); padding: 16px; }
   button { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 1em; }
   button:hover { background: var(--vscode-button-hoverBackground); }
+  input { display: block; margin: 6px 0; padding: 6px 8px; width: 16em; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border, var(--vscode-panel-border)); border-radius: 3px; font-size: 1em; }
   .cit-code-output { padding: 8px; min-height: 3em; max-height: 50vh; overflow: auto; background: var(--vscode-editor-background); border: 1px solid var(--vscode-panel-border); font-family: var(--vscode-editor-font-family); white-space: pre-wrap; }
   .cit-code-output[data-placeholder] { opacity: .5; }
+</style>
+<style>
+${ui.css || ''}
 </style></head><body>
-<div id="${esc(rootId)}">
+<div id="cit-app"><div id="${esc(rootId)}">
 ${body}
-</div>
+</div></div>
 <script nonce="${nonce}">
   const vscode = acquireVsCodeApi();
   const find = name => document.querySelector('[data-name="' + CSS.escape(name) + '"]');
+  const send = (el, event, value) => vscode.postMessage({ type: 'event', name: el.dataset.name, event, value });
+  const named = e => e.target.closest && e.target.closest('[data-name]');
   document.addEventListener('click', e => {
-    const b = e.target.closest('button[data-name]');
-    if (b) vscode.postMessage({ type: 'click', name: b.dataset.name });
+    const el = named(e);
+    if (!el) return;
+    el.classList.add('cit-clicked'); // styled by  id.X.clicked() { ... };
+    if (el.tagName !== 'INPUT') send(el, 'clicked');
   });
+  document.addEventListener('mouseover', e => { // hover: the mouse entered the element
+    const el = named(e);
+    if (!el || el.contains(e.relatedTarget)) return;
+    el.classList.remove('cit-hover-end');
+    send(el, 'hover');
+  });
+  document.addEventListener('mouseout', e => { // hoverEnd: the mouse left the element
+    const el = named(e);
+    if (!el || el.contains(e.relatedTarget)) return;
+    el.classList.add('cit-hover-end');
+    send(el, 'hoverEnd');
+  });
+  document.addEventListener('mousedown', e => { const el = named(e); if (el) send(el, 'active'); });
+  document.addEventListener('focusin', e => { if (e.target.tagName === 'INPUT') send(e.target, 'focus'); });
+  document.addEventListener('focusout', e => { if (e.target.tagName === 'INPUT') send(e.target, 'focusEnd'); });
+  document.addEventListener('input', e => { if (e.target.tagName === 'INPUT') send(e.target, 'typed', e.target.value); });
   window.addEventListener('message', e => {
     const m = e.data, el = find(m.name);
     if (!el) return;
@@ -164,6 +196,8 @@ ${body}
       if (el.hasAttribute('data-placeholder')) { el.textContent = ''; el.removeAttribute('data-placeholder'); }
       el.textContent += (el.textContent ? '\\n' : '') + m.text;
       el.scrollTop = el.scrollHeight;
+    } else if (m.type === 'value') {
+      el.value = m.value;
     }
   });
 </script></body></html>`;
@@ -185,8 +219,8 @@ function openPanel(ui, fire) {
   session = { fire };
   p.webview.html = uiHtml(ui, nonce);
   p.webview.onDidReceiveMessage(async msg => {
-    if (msg.type !== 'click') return;
-    const res = await fire(msg.name);
+    if (msg.type !== 'event') return;
+    const res = await fire(msg.name, msg.event, msg.value);
     if (res.error) reportError(res.error);
   });
   p.onDidDispose(async () => {
@@ -236,7 +270,8 @@ async function runCommand() {
       isCancelled: () => state.cancelled,
       uiReady: (ui, fire) => openPanel(ui, fire),
       uiUpdate: (name, text) => { if (panel) panel.webview.postMessage({ type: 'text', name, text }); },
-      uiOutput: (name, text) => { if (panel) panel.webview.postMessage({ type: 'append', name, text }); }
+      uiOutput: (name, text) => { if (panel) panel.webview.postMessage({ type: 'append', name, text }); },
+      uiValue: (name, value) => { if (panel) panel.webview.postMessage({ type: 'value', name, value }); }
     };
     const { exit, error, ui } = await run(editor.document.getText(), io);
     if (state.cancelled) {

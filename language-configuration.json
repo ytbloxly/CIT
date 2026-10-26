@@ -56,7 +56,7 @@
     ]
   ],
   "indentationRules": {
-    "increaseIndentPattern": "^\\s*(?:void\\s+main\\s*\\(\\s*\\)|ui\\.root\\s+\\w+\\s*\\(.*\\)|(?:if|for|func|else|while|class|task|when|raise)\\b.*\\bdo|(?:default|global|const)\\s+enum\\b.*\\bdo|.*\\(\\s*func\\s+\\w+\\s*\\([^)]*\\))\\s*(?:#.*)?$",
-    "decreaseIndentPattern": "^\\s*(?:end\\s*\\)?\\s*;|else\\b.*\\bdo)\\s*(?:#.*)?$"
+    "increaseIndentPattern": "^\\s*(?:void\\s+main\\s*\\(\\s*\\)|ui\\.(?:root|style)\\s+\\w+\\s*\\(.*\\)|(?:if|for|func|else|while|class|task|when|raise|switch|case|try|catch|except|finally)\\b.*\\bdo|default\\s+do|(?:default|global|const)\\s+enum\\b.*\\bdo|try\\s+do|.*\\{|.*\\(\\s*func\\s+\\w+\\s*\\([^)]*\\))\\s*(?:#.*)?$",
+    "decreaseIndentPattern": "^\\s*(?:end\\s*\\)?\\s*;|\\}\\s*;|(?:else|catch|except|finally)\\b.*\\bdo)\\s*(?:#.*)?$"
   }
 }

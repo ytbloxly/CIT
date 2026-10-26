@@ -2,7 +2,7 @@
   "name": "cit-language",
   "displayName": "CIT (Code Information Technology)",
   "description": "CIT language: syntax colors, checks, auto-closing end;, terminal runner and UI preview for .cit files",
-  "version": "0.5.0",
+  "version": "0.7.0",
   "publisher": "cit",
   "license": "MIT",
   "icon": "icon.png",

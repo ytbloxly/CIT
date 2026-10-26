@@ -1,0 +1,6 @@
+# Error types
+return error.NoErr;
+return error.Err;
+return error.ErrUnknown;
+return error.ErrParsedLine;
+return error.ErrExample;

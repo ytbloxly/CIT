@@ -1,0 +1,8 @@
+# This program stops with an error on purpose: tuples cannot be changed.
+void main()
+    default list tuple = (1, True, Null, "Hi!");
+    tuple[0] = 3; # Indexing, this will cause an error. In arrays, it will not
+    console.write(tuple); # (1, True, Null, "Hi!")
+end;
+
+return error.NoErr;

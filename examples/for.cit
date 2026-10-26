@@ -1,0 +1,8 @@
+# For loops
+void main()
+    for (default num i, range = 0, 12) do
+        console.write(i);
+    end;
+end;
+
+return error.NoErr;

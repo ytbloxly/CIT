@@ -1,0 +1,13 @@
+void main()
+    default num gradePercent = 100;
+    when (gradePercent) do
+        default string grade = "Unknown";
+        (gradePercent <= 100 && gradePercent > 90) >> grade = "A";
+        (gradePercent <= 89 && gradePercent > 65) >> grade = "B";
+        (gradePercent <= 64) >> grade = "Fail";
+    end;
+
+    console.write(f"My grade is {grade.value}");
+end;
+
+return error.NoErr;

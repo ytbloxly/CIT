@@ -1,0 +1,7 @@
+# Inputs
+void main()
+    default input name = console.input("What is your name? ");
+    console.write(f"Your name is {name.value}");
+end;
+
+return error.NoErr;

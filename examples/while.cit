@@ -1,0 +1,11 @@
+# While loops:  && = and,  || = or,  ! = not
+void main()
+    default num clicks = 0;
+    while (clicks < 5 && clicks <= 10) do
+        clicks += 1;
+        console.write(f"clicks = {clicks.value}");
+        task.wait(1);
+    end;
+end;
+
+return error.NoErr;

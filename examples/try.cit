@@ -1,0 +1,14 @@
+void main()
+    default string name = "bloxl";
+    try do
+        console.write("1. Trying to run code...");
+
+    catch (err) do
+        console.write("2. Runs only if there is an error.");
+
+    finally do
+        console.write("3. Runs ALWAYS, no matter what.");
+    end;
+end;
+
+return error.NoErr;

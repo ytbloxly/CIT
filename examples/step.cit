@@ -1,0 +1,12 @@
+void main()
+    default num i = 1;
+    i++;
+    ++i;
+    console.write(i);
+
+    i--;
+    --i;
+    console.write(i);
+end;
+
+return error.NoErr;

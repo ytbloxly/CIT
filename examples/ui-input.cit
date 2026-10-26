@@ -1,0 +1,14 @@
+import ui;
+
+ui.root main(name="Body", title="Inputs")
+    ui passwords -> ui.input(type="password", minLength=2, maxLength=16) = "Placeholder";
+    ui text_inp -> ui.input(type="text") = "Placeholder";
+    ui email_inp -> ui.input(type="email" required) = "Placeholder";
+    ui output -> ui.codeOutput() = "Output";
+end;
+
+void main()
+    console.write("Type something in the inputs");
+end;
+
+return error.NoErr;

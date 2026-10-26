@@ -1,0 +1,33 @@
+# break, continue, pass and return
+void main()
+    for (default num i, range = 0, 10) do
+        if (i == 2) do
+            continue;
+        end;
+        if (i == 5) do
+            break;
+        end;
+        console.write(i);
+    end;
+
+    if (True) do
+        pass;
+    end;
+
+    func double(n) do
+        return n * 2;
+    end;
+
+    func early(n) do
+        if (n < 0) do
+            return;
+        end;
+        console.write("positive");
+    end;
+
+    console.write(double(21));
+    console.write(early(-1));
+    early(1);
+end;
+
+return error.NoErr;

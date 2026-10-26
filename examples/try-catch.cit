@@ -1,0 +1,22 @@
+# try / catch / finally with a real error. except works exactly like catch.
+void main()
+    try do
+        console.write("1. Trying...");
+        default num x = 1 / 0;
+        console.write("never printed");
+    catch (err) do
+        console.write(f"2. Caught {err.name}: {err.message}");
+    finally do
+        console.write("3. Always runs");
+    end;
+
+    try do
+        raise error.ValueError do
+            console.write("raising...");
+        end;
+    except (problem) do
+        console.write(f"caught {problem.name}");
+    end;
+end;
+
+return error.NoErr;

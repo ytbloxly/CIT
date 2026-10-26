@@ -1,0 +1,11 @@
+# Type casting
+void main()
+    default num x = 5;
+    x = parseInt(x);
+    x = parseFloat(x);
+    x = parseString(x);
+    x = parseBool(x);
+    console.write(x);
+end;
+
+return error.NoErr;

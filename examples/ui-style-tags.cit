@@ -1,0 +1,37 @@
+import ui;
+import ui-style;
+
+ui.root main(name="Body", title="My App" style-connect="styler()")
+    ui my_button -> ui.button(id="Click", class="button") = "Click me!";
+end;
+
+ui.style styler()
+    id.Click {
+        background-color = hsl(210, 80, 50);
+        text-color = rgba(255, 255, 255, 0.9);
+        border-color = hwb(120, 10, 10);
+        border-type = dashed;
+        border-size = px(3);
+        font-size = em(1.2);
+        font-family = "Verdana", "Tahoma", sans-serif;
+        width = per(50);
+        height = px(48);
+        display = flexbox;
+        margin = px(10), px(20);
+        padding = px(8);
+        border-corner = px(12);
+        position = relative;
+        transform = translate(px(5), px(0)), rotate(2), scale(1.1);
+    };
+    name.my_button {};
+    class.button { border = px(1), solid, hex("333333"); };
+    ui.button {};
+    ui.button, ui.h2 {};
+    uni {};
+end;
+
+void main()
+    console.write("all style tags");
+end;
+
+return error.NoErr;

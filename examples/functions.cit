@@ -1,0 +1,11 @@
+# Functions
+void main()
+    func add(a, b) do
+        default num result = parseFloat(a + b);
+        console.write(result);
+    end;
+
+    add(2, 4);
+end;
+
+return error.NoErr;

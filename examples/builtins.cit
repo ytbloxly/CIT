@@ -1,0 +1,29 @@
+void main()
+    console.write(type(5));            # num
+    console.write(type([1, 2]));       # list
+    console.write(type((1, 2)));       # tuple
+    console.write(type({1, 2}));       # set
+    console.write(type({a: 1}));       # dict
+    console.write(len("hello"));       # 5
+    console.write(list("abc"));        # ["a", "b", "c"]
+    console.write(set([1, 2, 2, 3]));  # {1, 2, 3}
+    console.write(tuple([1, 2]));      # (1, 2)
+    console.write(max(3, 9, 4));       # 9
+    console.write(min([3, 9, 4]));     # 3
+
+    default classIns b = Builder();
+    console.write(type(b));                    # Builder
+    console.write(isinstance(b, Person));      # True  (Builder inherits Person)
+    console.write(isinstance(b, (Person, Builder)));
+    console.write(isinstance(5, "num"));       # True
+    console.write(issubclass(Builder, Person)); # True
+    console.write(issubclass(Person, Builder)); # False
+end;
+
+class Person() do
+end;
+
+class Builder(Person) do
+end;
+
+return error.NoErr;

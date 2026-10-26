@@ -1,0 +1,13 @@
+# If statements
+void main()
+    default num x = 5;
+    if (x == 5) do
+        console.write(f"{x.name} value is {x.value}");
+    else if (x != 5) do
+        console.write(f"{x.name} isn't 5");
+    else do
+        console.write(f"Both are wrong");
+    end;
+end;
+
+return error.NoErr;

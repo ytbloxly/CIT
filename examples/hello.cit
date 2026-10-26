@@ -1,0 +1,6 @@
+# Hello World! example
+void main()
+    console.write("Hello World!");
+end;
+
+return error.NoErr;

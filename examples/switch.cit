@@ -1,0 +1,18 @@
+void main()
+    default string name = "bloxl";
+    switch (name) do
+        case "bloxly" do
+            console.write("Your name is bloxly");
+        end;
+
+        case "bloxl" do
+            console.write("Your name is bloxl");
+        end;
+
+        default do
+            console.write("I don't know your name yet!");
+        end;
+    end;
+end;
+
+return error.NoErr;

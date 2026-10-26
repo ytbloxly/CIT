@@ -1,0 +1,13 @@
+# Tasks run in the background. A task starts running right away and gives control back at its first task.wait().
+void main()
+    task.start(console()) until task.repeated(5);
+    task.repeat(console(), 4);
+    task.stop(console());
+end;
+
+task console() do
+    console.write("Hello World!");
+    task.wait(3);
+end;
+
+return error.NoErr;

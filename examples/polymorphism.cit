@@ -1,0 +1,39 @@
+# Same call, different class -> different behaviour.
+# Functions without a return value give back Null, so console.write(some.talk()) also prints Null.
+void main()
+    default classIns b = Builder("Bob", 30, "ACME");
+    b.talk();
+    console.write(f"{b.name} is {b.age}");
+
+    func info(some) do
+        console.write(some.talk());
+    end;
+
+    info(b);
+    info(Person("Ann", 25));
+end;
+
+class Person() do
+    func _init(name, age) do
+        this.name = parseString(name);
+        this.age = parseInt(age);
+    end;
+
+    func talk() do
+        console.write("I am talking");
+    end;
+end;
+
+class Builder(Person) do
+    func _init(name, age, company) do
+        super._init(name, age);
+        this.company = parseString(company);
+    end;
+
+    func talk() do
+        super.talk();
+        console.write(f"I build for {this.company}");
+    end;
+end;
+
+return error.NoErr;

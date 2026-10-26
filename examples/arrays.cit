@@ -1,0 +1,9 @@
+void main()
+    default list array = [1, True, Null, "Hi!"];
+    console.write(array); # [1, True, Null, "Hi!"]
+    array[0] = 3;         # lists can be changed by index
+    console.write(array[0]);
+    console.write(array.length);
+end;
+
+return error.NoErr;

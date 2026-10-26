@@ -1,0 +1,17 @@
+# Default values. Write the parameter's own name as the argument to use its default.
+void main()
+    func add(a = 1, b) do
+        return a + b;
+    end;
+
+    console.write(add(a, 2)); # 3
+    console.write(add(2, 2)); # 4
+
+    func greet(name, greeting = "Hello") do
+        console.write(f"{greeting}, {name}!");
+    end;
+    greet("Ann");             # Hello, Ann!
+    greet("Bob", "Hi");       # Hi, Bob!
+end;
+
+return error.NoErr;

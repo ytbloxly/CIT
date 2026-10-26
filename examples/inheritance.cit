@@ -1,0 +1,27 @@
+void main()
+    default classIns person1 = Person("Jake", 21);
+    console.write(f"{person1.name} is {person1.age} years old!");
+
+    default classIns builder1 = Builder("Brickworks");
+    builder1.talk();
+    console.write(f"Works at {builder1.company}");
+end;
+
+class Person() do
+    func _init(name, age) do
+        this.name = parseString(name);
+        this.age = parseInt(age);
+    end;
+
+    func talk() do
+        console.write("I am talking");
+    end;
+end;
+
+class Builder(Person) do
+    func _init(company) do
+        this.company = parseString(company);
+    end;
+end;
+
+return error.NoErr;

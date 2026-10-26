@@ -1,0 +1,11 @@
+# Run a task 3 times, it ends by itself and the program ends after it.
+void main()
+    task.repeat(tick(), 3);
+end;
+
+task tick() do
+    console.write("tick");
+    task.wait(1);
+end;
+
+return error.NoErr;

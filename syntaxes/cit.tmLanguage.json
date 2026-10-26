@@ -27,6 +27,9 @@
       "include": "#importkw"
     },
     {
+      "include": "#mathns"
+    },
+    {
       "include": "#uins"
     },
     {
@@ -36,16 +39,37 @@
       "include": "#rangekw"
     },
     {
+      "include": "#statekw"
+    },
+    {
+      "include": "#selector"
+    },
+    {
+      "include": "#uni"
+    },
+    {
+      "include": "#styleprop"
+    },
+    {
+      "include": "#attrflag"
+    },
+    {
       "include": "#attrname"
     },
     {
       "include": "#keywords"
     },
     {
+      "include": "#cssvalue"
+    },
+    {
       "include": "#modifiers"
     },
     {
       "include": "#types"
+    },
+    {
+      "include": "#optional"
     },
     {
       "include": "#constants"
@@ -72,10 +96,16 @@
       "include": "#arrow"
     },
     {
+      "include": "#pairarrow"
+    },
+    {
       "include": "#comparison"
     },
     {
       "include": "#logical"
+    },
+    {
+      "include": "#bitops"
     },
     {
       "include": "#assign"
@@ -132,7 +162,7 @@
       }
     },
     "importkw": {
-      "match": "\\b(import)\\s+([A-Za-z_]\\w*)",
+      "match": "\\b(import)\\s+([A-Za-z_][\\w-]*)",
       "captures": {
         "1": {
           "name": "keyword.control.import.cit"
@@ -143,7 +173,7 @@
       }
     },
     "uins": {
-      "match": "\\b(ui)(\\.)(root|button|p|h1|h2|h3|codeOutput)\\b",
+      "match": "\\b(ui)(\\.)(root|style|button|p|h1|h2|h3|input|codeOutput)\\b",
       "captures": {
         "1": {
           "name": "support.class.cit"
@@ -176,11 +206,11 @@
     },
     "attrname": {
       "name": "entity.other.attribute-name.cit",
-      "match": "\\b(id|class|name|title)\\b(?=\\s*=\\s*\\\")"
+      "match": "\\b(id|class|name|title|style-connect|type|minLength|maxLength)\\b(?=\\s*=\\s*[\\\"\\d])"
     },
     "keywords": {
       "name": "keyword.control.cit",
-      "match": "\\b(if|else|for|while|do|end|return|class|break|continue|pass|when|raise|until)\\b"
+      "match": "\\b(if|else|for|while|do|end|return|class|break|continue|pass|when|is|raise|until|switch|case|try|catch|except|finally|as)\\b"
     },
     "modifiers": {
       "name": "storage.modifier.cit",
@@ -218,7 +248,7 @@
     },
     "casts": {
       "name": "support.function.cast.cit",
-      "match": "\\b(parseInt|parseFloat|parseString|parseBool)\\b"
+      "match": "\\b(parseInt|parseFloat|parseString|parseBool|type|isinstance|issubclass|len|list|set|tuple|max|min)\\b(?=\\s*\\()"
     },
     "thisvar": {
       "name": "variable.language.this.cit",
@@ -306,6 +336,12 @@
           },
           "patterns": [
             {
+              "include": "#bitops"
+            },
+            {
+              "include": "#mathns"
+            },
+            {
               "include": "#constants"
             },
             {
@@ -371,6 +407,12 @@
           },
           "patterns": [
             {
+              "include": "#bitops"
+            },
+            {
+              "include": "#mathns"
+            },
+            {
               "include": "#constants"
             },
             {
@@ -418,6 +460,73 @@
     "step": {
       "name": "keyword.operator.increment.cit",
       "match": "(\\+\\+|--)"
+    },
+    "selector": {
+      "match": "\\b(id|name|class)(\\.)([A-Za-z_][\\w-]*)",
+      "captures": {
+        "1": {
+          "name": "entity.name.tag.cit"
+        },
+        "2": {
+          "name": "punctuation.accessor.cit"
+        },
+        "3": {
+          "name": "entity.other.attribute-name.class.cit"
+        }
+      }
+    },
+    "uni": {
+      "name": "entity.name.tag.universal.cit",
+      "match": "\\buni\\b(?=\\s*[,{])"
+    },
+    "styleprop": {
+      "name": "support.type.property-name.cit",
+      "match": "\\b(background-color|text-color|border-color|border-type|border-size|border-corner|border|font-size|font-family|width|height|display|margin|padding|position|transform)\\b(?=\\s*=)"
+    },
+    "cssvalue": {
+      "name": "support.constant.property-value.cit",
+      "match": "\\b(solid|dashed|double|groove|dotted|ridge|inset|outset|hidden|serif|sans-serif|monospace|cursive|fantasy|system-ui|inline-block|inline|grid|flexbox|flex|block|static|relative|sticky|absolute|fixed|translate|scale|rotate|skew)\\b"
+    },
+    "attrflag": {
+      "name": "entity.other.attribute-name.cit",
+      "match": "\\brequired\\b(?=\\s*\\))"
+    },
+    "mathns": {
+      "match": "\\b(math)(\\.)(pi|e|tau|ceiling|floor|trunc|sqrt|cbrt|power|log10|log|sin|cos|tan|degrees|radians|factorial|gcd|fabs)\\b",
+      "captures": {
+        "1": {
+          "name": "support.class.cit"
+        },
+        "2": {
+          "name": "punctuation.accessor.cit"
+        },
+        "3": {
+          "name": "support.function.cit"
+        }
+      }
+    },
+    "optional": {
+      "name": "storage.type.cit",
+      "match": "(?<=\\bdefault\\s|\\bglobal\\s|\\bconst\\s)\\?"
+    },
+    "statekw": {
+      "match": "(\\.)(clicked|hover|hoverEnd|active)(?=\\(\\)\\s*(?:\\{|,))",
+      "captures": {
+        "1": {
+          "name": "punctuation.accessor.cit"
+        },
+        "2": {
+          "name": "entity.other.pseudo-class.cit"
+        }
+      }
+    },
+    "pairarrow": {
+      "name": "keyword.operator.arrow.cit",
+      "match": "=>"
+    },
+    "bitops": {
+      "name": "keyword.operator.set.cit",
+      "match": "(?<![|&])[|&^](?![|&])"
     }
   }
 }

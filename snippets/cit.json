@@ -190,8 +190,8 @@
     "prefix": "when",
     "body": [
       "when (${1:value}) do",
-      "\t(${2:condition}) >> ${3:statement};",
-      "\telse >> ${4:statement};",
+      "\t(${2:condition}) is ${3:statement};",
+      "\telse is ${4:statement};",
       "end;"
     ],
     "description": "when statement"
@@ -221,5 +221,148 @@
       "default list ${1:info} = {${2:name}: ${3:\"Bob\"}, ${4:age}: ${5:32}};"
     ],
     "description": "dictionary"
+  },
+  "Default parameter": {
+    "prefix": "funcdefault",
+    "body": [
+      "func ${1:name}(${2:a} = ${3:1}, ${4:b}) do",
+      "\treturn $0;",
+      "end;"
+    ],
+    "description": "function with a default value"
+  },
+  "Switch": {
+    "prefix": "switch",
+    "body": [
+      "switch (${1:value}) do",
+      "\tcase ${2:\"a\"} do",
+      "\t\t$3",
+      "\tend;",
+      "",
+      "\tdefault do",
+      "\t\t$0",
+      "\tend;",
+      "end;"
+    ],
+    "description": "switch / case"
+  },
+  "Try": {
+    "prefix": "try",
+    "body": [
+      "try do",
+      "\t$1",
+      "catch (${2:err}) do",
+      "\t$3",
+      "finally do",
+      "\t$0",
+      "end;"
+    ],
+    "description": "try / catch / finally"
+  },
+  "Try except": {
+    "prefix": "tryexcept",
+    "body": [
+      "try do",
+      "\t$1",
+      "except (${2:err}) do",
+      "\t$0",
+      "end;"
+    ],
+    "description": "try / except"
+  },
+  "UI style": {
+    "prefix": "uistyle",
+    "body": [
+      "ui.style ${1:styler}()",
+      "\tclass.${2:button} {",
+      "\t\tbackground-color = color(\"${3:blue}\");",
+      "\t\ttext-color = color(\"white\");",
+      "\t};",
+      "end;"
+    ],
+    "description": "ui style sheet"
+  },
+  "UI input": {
+    "prefix": "uiinput",
+    "body": [
+      "ui ${1:text_inp} -> ui.input(type=\"${2:text}\") = \"${3:Placeholder}\";"
+    ],
+    "description": "ui input"
+  },
+  "On typed": {
+    "prefix": "typed",
+    "body": [
+      "${1:text_inp}.typed(func ${2:typing}()",
+      "\t$0",
+      "end);"
+    ],
+    "description": "input typed event"
+  },
+  "Import math": {
+    "prefix": "importmath",
+    "body": [
+      "import math as ${1:m};"
+    ],
+    "description": "math module"
+  },
+  "Set": {
+    "prefix": "set",
+    "body": [
+      "default list ${1:items} = {${2:1, 2, 3}};"
+    ],
+    "description": "set (unique items)"
+  },
+  "Optional": {
+    "prefix": "optional",
+    "body": [
+      "default ? ${1:unknown} = Null;"
+    ],
+    "description": "variable of any type"
+  },
+  "When is": {
+    "prefix": "whenis",
+    "body": [
+      "when (${1:value}) do",
+      "\t(${2:condition}) is ${3:statement};",
+      "\telse is ${4:statement};",
+      "end;"
+    ],
+    "description": "when ... is"
+  },
+  "Hover": {
+    "prefix": "hover",
+    "body": [
+      "${1:my_button}.hover(func ${2:hovering}()",
+      "\t$0",
+      "end);"
+    ],
+    "description": "mouse enters the element"
+  },
+  "Hover end": {
+    "prefix": "hoverend",
+    "body": [
+      "${1:my_button}.hoverEnd(func ${2:leaving}()",
+      "\t$0",
+      "end);"
+    ],
+    "description": "mouse leaves the element"
+  },
+  "Active": {
+    "prefix": "active",
+    "body": [
+      "${1:my_button}.active(func ${2:pressing}()",
+      "\t$0",
+      "end);"
+    ],
+    "description": "mouse button pressed on the element"
+  },
+  "Style state": {
+    "prefix": "stylestate",
+    "body": [
+      "id.${1:Click}.${2|hover,hoverEnd,active,clicked|}() {",
+      "\t$0",
+      "};"
+    ],
+    "description": "style for a state"
   }
 }

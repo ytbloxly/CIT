@@ -1,4 +1,0 @@
-*.png linguist-documentation=false linguist-vendored=false linguist-detectable=true
-*.md linguist-documentation=false linguist-vendored=false linguist-detectable=true
-LICENSE linguist-documentation=false linguist-vendored=false linguist-detectable=true
-.vscodeignore linguist-documentation=false linguist-vendored=false linguist-detectable=true

@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-0.7.1-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-0.8.0-blue">
   <img alt="Files" src="https://img.shields.io/badge/files-.cit%20%7C%20.ct-informational">
   <img alt="Editor" src="https://img.shields.io/badge/editor-VS%20Code-007ACC">
 </p>
@@ -67,10 +67,22 @@ println("Hello, World!")
 ### A quick tour
 
 ```
-# Variables: inferred, mutable, and typed
+# Variables: inferred, mutable and typed
 let name = "Ada"
 let mut total = 0
 int age = 23
+
+# Empty variables must be "let mut" (they get a value later)
+let mut nickname
+nickname = "Coder"
+
+# Several variables at once
+let a, b, c = 2, 3, 4    # a = 2, b = 3, c = 4
+
+# Math shortcuts: += -= *= /= %= **= //=
+total += 10
+total *= 6
+println(total)           # 60
 
 # Conditions
 if (total >= 60) {
@@ -86,16 +98,31 @@ for (let i, range = 0, 5) {
     println(i)
 }
 
-while (total < 3) {
-    total = total + 1
+while (total < 63) {
+    total += 1
 }
+
+do {
+    total -= 1
+} while (total > 61)
+println(total)           # 61
+
+# Lists
+let mut nums = [1, 2, 3, 4]
+nums.append(5)
+nums.insert(0, 0)
+println(nums)            # [0, 1, 2, 3, 4, 5]
+println(nums.pop())      # 5
+println(nums[0], len(nums))
+println(sum(nums), min(nums), max(nums))
+println(range(2, 6))     # [2, 3, 4, 5]
 
 # Functions with default and named arguments
 fn add(a, b = 1) {
     return a + b
 }
-println(add(2))        # 3
-println(add(2, b: 4))  # 6
+let result = add(2, b: 4)
+println(result)          # 6
 
 # Classes
 class person() {
@@ -121,8 +148,13 @@ println(castInt("42"))
 ### Features
 
 - Inferred variables (`let`), mutable variables (`let mut`) and typed declarations (`int`, `float`, `str`, `char`, `bool`).
-- `if` / `elseif` / `else`, `while`, numeric `for` with `range`, plus `break`, `continue`, `pass` and `return`.
-- Functions with default and named arguments.
+- **Empty variables** (`let mut name`, then `name = "Coder"`). An empty variable has to be `mut`, because otherwise it would stay empty forever.
+- **Multiple assignment**: `let a, b, c = 2, 3, 4`.
+- **Math shortcuts**: `+=`, `-=`, `*=`, `/=`, `%=`, `**=`, `//=`.
+- `if` / `elseif` / `else`, `while`, **`do { ... } while (...)`**, numeric `for` with `range`, plus `break`, `continue`, `pass` and `return`.
+- **Lists**: `[1, 2, 3]`, indexing (`nums[0]`, `nums[-1]`) and the methods `append`, `pop`, `insert`, `clear`, `remove`, `reverse`, `count`, `index` and `copy`. Changing a list needs `let mut`.
+- **Built-in functions**: `range()`, `min()`, `max()`, `sum()` and `len()`.
+- Functions with default and named arguments. A function call can be stored in a variable (`let x = add(12)`), and a function itself can be stored too (`let f = add`).
 - Classes with `fn struct(...)` constructors and `self`.
 - Interpolated strings: `$"Hello, {name}!"`.
 - Operators: `+ - * / % // **`, `== != < > <= >=`, `&& || !`, and the words `and` / `or` / `not`.
@@ -130,11 +162,27 @@ println(castInt("42"))
 - Comments with `#` and `/* ... */`.
 - Modules and packages with `import "name"` and `import "name" as alias`.
 
+### Lists at a glance
+
+```
+let mut nums = [3, 1, 2]
+nums.append(4)         # [3, 1, 2, 4]
+nums.insert(1, 9)      # [3, 9, 1, 2, 4]
+nums.remove(9)         # [3, 1, 2, 4]
+println(nums.pop())    # 4
+nums.reverse()         # [2, 1, 3]
+println(nums.count(1), nums.index(3))   # 1 2
+let copy = nums.copy() # an independent copy
+nums.clear()           # []
+```
+
+`pop()` takes the last item (or `pop(i)` for item `i`). `remove(x)` and `index(x)` stop with an error if `x` is not in the list. Without `mut`, a list can be read but not changed.
+
 ### Install the VS Code extension
 
 1. Open VS Code and go to Extensions (`Ctrl+Shift+X`).
 2. Click the `...` menu and choose **Install from VSIX...**.
-3. Select `cit-language-0.7.1.vsix`.
+3. Select `cit-language-0.8.0.vsix`.
 4. Open any `.cit` or `.ct` file. VS Code selects CIT automatically.
 5. Run it with the Play button in the editor, the right-click menu, or `Ctrl+F5`.
 
@@ -247,6 +295,18 @@ let name = "Ada"
 let mut total = 0
 int age = 23
 
+# Las variables vacías deben ser "let mut" (reciben valor después)
+let mut nickname
+nickname = "Coder"
+
+# Varias variables a la vez
+let a, b, c = 2, 3, 4    # a = 2, b = 3, c = 4
+
+# Atajos matemáticos: += -= *= /= %= **= //=
+total += 10
+total *= 6
+println(total)           # 60
+
 # Condiciones
 if (total >= 60) {
     println("¡Excelente!")
@@ -261,16 +321,31 @@ for (let i, range = 0, 5) {
     println(i)
 }
 
-while (total < 3) {
-    total = total + 1
+while (total < 63) {
+    total += 1
 }
+
+do {
+    total -= 1
+} while (total > 61)
+println(total)           # 61
+
+# Listas
+let mut nums = [1, 2, 3, 4]
+nums.append(5)
+nums.insert(0, 0)
+println(nums)            # [0, 1, 2, 3, 4, 5]
+println(nums.pop())      # 5
+println(nums[0], len(nums))
+println(sum(nums), min(nums), max(nums))
+println(range(2, 6))     # [2, 3, 4, 5]
 
 # Funciones con argumentos por defecto y con nombre
 fn add(a, b = 1) {
     return a + b
 }
-println(add(2))        # 3
-println(add(2, b: 4))  # 6
+let result = add(2, b: 4)
+println(result)          # 6
 
 # Clases
 class person() {
@@ -288,16 +363,21 @@ p.talk()
 # Entrada, salida en color y conversiones
 let answer = input("¿Cómo te llamas? ")
 println($"¡Hola, {answer}!")
-warnln("Esto es una advertencia")   # amarillo
-errorln("Esto es un error")         # rojo
+warnln("Esto es una advertencia")      # amarillo
+errorln("Esto es un error")      # rojo
 println(castInt("42"))
 ```
 
 ### Características
 
 - Variables inferidas (`let`), variables mutables (`let mut`) y declaraciones con tipo (`int`, `float`, `str`, `char`, `bool`).
-- `if` / `elseif` / `else`, `while`, `for` numérico con `range`, además de `break`, `continue`, `pass` y `return`.
-- Funciones con argumentos por defecto y con nombre.
+- **Variables vacías** (`let mut name`, y luego `name = "Coder"`). Una variable vacía tiene que ser `mut`, porque si no se quedaría vacía para siempre.
+- **Asignación múltiple**: `let a, b, c = 2, 3, 4`.
+- **Atajos matemáticos**: `+=`, `-=`, `*=`, `/=`, `%=`, `**=`, `//=`.
+- `if` / `elseif` / `else`, `while`, **`do { ... } while (...)`**, `for` numérico con `range`, además de `break`, `continue`, `pass` y `return`.
+- **Listas**: `[1, 2, 3]`, índices (`nums[0]`, `nums[-1]`) y los métodos `append`, `pop`, `insert`, `clear`, `remove`, `reverse`, `count`, `index` y `copy`. Para modificar una lista hace falta `let mut`.
+- **Funciones integradas**: `range()`, `min()`, `max()`, `sum()` y `len()`.
+- Funciones con argumentos por defecto y con nombre. El resultado de una función se puede guardar en una variable (`let x = add(12)`) y la propia función también (`let f = add`).
 - Clases con constructores `fn struct(...)` y `self`.
 - Cadenas interpoladas: `$"¡Hola, {name}!"`.
 - Operadores: `+ - * / % // **`, `== != < > <= >=`, `&& || !` y las palabras `and` / `or` / `not`.
@@ -305,11 +385,27 @@ println(castInt("42"))
 - Comentarios con `#` y `/* ... */`.
 - Módulos y paquetes con `import "nombre"` e `import "nombre" as alias`.
 
+### Listas de un vistazo
+
+```
+let mut nums = [3, 1, 2]
+nums.append(4)         # [3, 1, 2, 4]
+nums.insert(1, 9)      # [3, 9, 1, 2, 4]
+nums.remove(9)         # [3, 1, 2, 4]
+println(nums.pop())    # 4
+nums.reverse()         # [2, 1, 3]
+println(nums.count(1), nums.index(3))   # 1 2
+let copy = nums.copy() # una copia independiente
+nums.clear()           # []
+```
+
+`pop()` quita el último elemento (o `pop(i)` el elemento `i`). `remove(x)` e `index(x)` se detienen con un error si `x` no está en la lista. Sin `mut`, una lista se puede leer pero no modificar.
+
 ### Instalar la extensión de VS Code
 
 1. Abre VS Code y ve a Extensiones (`Ctrl+Shift+X`).
 2. Haz clic en el menú `...` y elige **Instalar desde VSIX...**.
-3. Selecciona `cit-language-0.7.1.vsix`.
+3. Selecciona `cit-language-0.8.0.vsix`.
 4. Abre cualquier archivo `.cit` o `.ct`. VS Code selecciona CIT automáticamente.
 5. Ejecútalo con el botón Play del editor, el menú contextual o `Ctrl+F5`.
 

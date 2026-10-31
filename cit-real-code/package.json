@@ -1,0 +1,146 @@
+{
+  "name": "cit-language",
+  "displayName": "CIT - Code Information Technology",
+  "description": "CIT language support with loops, functions, classes, terminal input, colored errorln/warnln, the ipcit package manager, and a bundled interpreter.",
+  "version": "0.7.1",
+  "publisher": "cit-language",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "main": "./extension.js",
+  "activationEvents": [
+    "onLanguage:cit",
+    "onCommand:cit.runFile",
+    "onCommand:cit.compileBytecode",
+    "onCommand:cit.checkFile",
+    "onCommand:cit.openIpcit"
+  ],
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "cit",
+        "aliases": [
+          "CIT",
+          "Code Information Technology"
+        ],
+        "extensions": [
+          ".cit",
+          ".ct"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "cit",
+        "scopeName": "source.cit",
+        "path": "./syntaxes/cit.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "cit",
+        "path": "./snippets/cit.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "cit.runFile",
+        "title": "CIT: Run Current File",
+        "icon": "$(play)"
+      },
+      {
+        "command": "cit.compileBytecode",
+        "title": "CIT: Compile to CIT Bytecode",
+        "icon": "$(file-binary)"
+      },
+      {
+        "command": "cit.checkFile",
+        "title": "CIT: Check Current File",
+        "icon": "$(check-circle)"
+      },
+      {
+        "command": "cit.openIpcit",
+        "title": "CIT: Open ipcit (Package Manager)",
+        "icon": "$(package)"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "cit.runFile",
+        "key": "ctrl+f5",
+        "when": "editorTextFocus && editorLangId == cit"
+      },
+      {
+        "command": "cit.compileBytecode",
+        "key": "ctrl+shift+f5",
+        "when": "editorTextFocus && editorLangId == cit"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "cit.runFile",
+          "when": "editorLangId == cit",
+          "group": "navigation@1"
+        },
+        {
+          "command": "cit.compileBytecode",
+          "when": "editorLangId == cit",
+          "group": "navigation@2"
+        },
+        {
+          "command": "cit.checkFile",
+          "when": "editorLangId == cit",
+          "group": "navigation@3"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "cit.runFile",
+          "when": "editorLangId == cit",
+          "group": "navigation"
+        },
+        {
+          "command": "cit.compileBytecode",
+          "when": "editorLangId == cit",
+          "group": "navigation"
+        },
+        {
+          "command": "cit.checkFile",
+          "when": "editorLangId == cit",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "cit.runFile"
+        },
+        {
+          "command": "cit.compileBytecode"
+        },
+        {
+          "command": "cit.checkFile"
+        },
+        {
+          "command": "cit.openIpcit"
+        }
+      ]
+    },
+    "iconThemes": [
+      {
+        "id": "cit-file-icons",
+        "label": "CIT File Icons",
+        "path": "./fileicons/cit-icon-theme.json"
+      }
+    ]
+  },
+  "icon": "icon.png",
+  "bin": {
+    "cit": "./bin/cit.js",
+    "ipcit": "./bin/ipcit.js"
+  }
+}

@@ -1,0 +1,124 @@
+{
+  "CIT Hello World": {
+    "prefix": "hello",
+    "body": [
+      "println(\"Hello World!\")"
+    ],
+    "description": "Print Hello World in CIT"
+  },
+  "CIT Mutable Variable": {
+    "prefix": "letmut",
+    "body": [
+      "let mut ${1:name} = ${2:value}"
+    ],
+    "description": "Declare a mutable inferred variable"
+  },
+  "CIT Typed Variable": {
+    "prefix": "typed",
+    "body": [
+      "${1|int,float,str,char,bool|} ${2:name} = ${3:value}"
+    ],
+    "description": "Declare a typed variable"
+  },
+  "CIT If Statement": {
+    "prefix": "if",
+    "body": [
+      "if (${1:condition}) {",
+      "\t${2:println(\"True!\")}",
+      "} elseif (${3:other_condition}) {",
+      "\t${4:println(\"Else if!\")}",
+      "} else {",
+      "\t${5:println(\"False!\")}",
+      "}"
+    ],
+    "description": "Insert a CIT if / elseif / else statement"
+  },
+  "CIT Multi-line Comment": {
+    "prefix": "comment",
+    "body": [
+      "/*",
+      "${1:Comment}",
+      "*/"
+    ],
+    "description": "Insert a CIT block comment"
+  },
+  "CIT For Loop": {
+    "prefix": "forrange",
+    "body": [
+      "for (let ${1:i}, range = ${2:0}, ${3:10}) {",
+      "$\tprintln(${1:i})",
+      "}"
+    ],
+    "description": "Iterate over a numeric range (end is exclusive)"
+  },
+  "CIT While Loop": {
+    "prefix": "while",
+    "body": [
+      "while (${1:condition}) {",
+      "$\t${2:pass}",
+      "}"
+    ],
+    "description": "Repeat while a condition is true"
+  },
+  "CIT Function": {
+    "prefix": "fn",
+    "body": [
+      "fn ${1:name}(${2:a}, ${3:b = 1}) {",
+      "$\treturn ${4:a + b}",
+      "}"
+    ],
+    "description": "Declare a function with optional default parameters"
+  },
+  "CIT Class": {
+    "prefix": "class",
+    "body": [
+      "class ${1:person}() {",
+      "$\tfn struct(${2:name}, ${3:age}) {",
+      "$\t\tself.name = ${2:name}",
+      "$\t\tself.age = ${3:age}",
+      "$\t}",
+      "",
+      "\tfn talk() {",
+      "$\t\tprintln(\"Hello, I am talking!\")",
+      "$\t}",
+      "$}"
+    ],
+    "description": "Declare a class with a struct constructor and methods"
+  },
+  "CIT Input": {
+    "prefix": "input",
+    "body": [
+      "let ${1:name} = input(\"${2:What is your name? }\")",
+      "println($\"Hello, {${1:name}}!\")"
+    ],
+    "description": "Prompt for user input and use a template string"
+  },
+  "CIT Error": {
+    "prefix": "errorln",
+    "body": [
+      "errorln(\"${1:Something went wrong}\")"
+    ],
+    "description": "Print an error message"
+  },
+  "CIT Warning": {
+    "prefix": "warnln",
+    "body": [
+      "warnln(\"${1:Be careful}\")"
+    ],
+    "description": "Print a warning message"
+  },
+  "CIT Import": {
+    "prefix": "import",
+    "body": [
+      "import \"${1:package}\""
+    ],
+    "description": "Import an ipcit package or a .cit file"
+  },
+  "CIT Import As": {
+    "prefix": "importas",
+    "body": [
+      "import \"${1:package}\" as ${2:alias}"
+    ],
+    "description": "Import a package under another name"
+  }
+}

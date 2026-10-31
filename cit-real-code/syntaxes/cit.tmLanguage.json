@@ -1,0 +1,299 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "CIT",
+  "scopeName": "source.cit",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#templateStrings"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#characters"
+    },
+    {
+      "include": "#declarations"
+    },
+    {
+      "include": "#classNames"
+    },
+    {
+      "include": "#functionDeclarations"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#constants"
+    },
+    {
+      "include": "#builtins"
+    },
+    {
+      "include": "#self"
+    },
+    {
+      "include": "#types"
+    },
+    {
+      "include": "#operators"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#punctuation"
+    },
+    {
+      "include": "#variables"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.number-sign",
+          "begin": "#",
+          "end": "$"
+        },
+        {
+          "name": "comment.block",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "strings": {
+      "name": "string.quoted.double",
+      "begin": "\"",
+      "end": "\"",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.begin"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.end"
+        }
+      },
+      "patterns": [
+        {
+          "name": "constant.character.escape",
+          "match": "\\\\."
+        }
+      ]
+    },
+    "characters": {
+      "name": "string.quoted.single",
+      "begin": "'",
+      "end": "'",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.begin"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.end"
+        }
+      },
+      "patterns": [
+        {
+          "name": "constant.character.escape",
+          "match": "\\\\."
+        }
+      ]
+    },
+    "declarations": {
+      "patterns": [
+        {
+          "match": "\\b(let)\\s+(mut)\\b",
+          "captures": {
+            "1": {
+              "name": "storage.type"
+            },
+            "2": {
+              "name": "storage.modifier"
+            }
+          }
+        },
+        {
+          "match": "\\b(let)\\b",
+          "name": "storage.type"
+        }
+      ]
+    },
+    "keywords": {
+      "name": "keyword.control",
+      "match": "\\b(if|elseif|else|while|for|range|fn|class|return|break|continue|pass|and|or|not)\\b"
+    },
+    "constants": {
+      "patterns": [
+        {
+          "name": "constant.language",
+          "match": "\\b(true|false)\\b"
+        },
+        {
+          "name": "constant.language",
+          "match": "\\bnull\\b"
+        }
+      ]
+    },
+    "functions": {
+      "name": "support.function",
+      "match": "\\b(println|errorln|warnln|input|castInt|castFloat|castString|castBool)\\b(?=\\s*\\()"
+    },
+    "types": {
+      "name": "storage.type",
+      "match": "\\b(int|float|str|char|bool)\\b"
+    },
+    "operators": {
+      "name": "keyword.operator",
+      "match": "==|!=|<=|>=|&&|\\|\\||\\*\\*|//|[+\\-*/%<>=!]"
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric",
+          "match": "\\b[0-9]+\\.[0-9]+\\b"
+        },
+        {
+          "name": "constant.numeric",
+          "match": "\\b[0-9]+\\b"
+        }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "name": "punctuation.section.block.begin",
+          "match": "\\{"
+        },
+        {
+          "name": "punctuation.section.block.end",
+          "match": "\\}"
+        },
+        {
+          "name": "punctuation.section.group.begin",
+          "match": "\\("
+        },
+        {
+          "name": "punctuation.section.group.end",
+          "match": "\\)"
+        },
+        {
+          "name": "punctuation.terminator",
+          "match": ";"
+        }
+      ]
+    },
+    "builtins": {
+      "patterns": [
+        {
+          "name": "support.function",
+          "match": "\\b(println|errorln|warnln|input|castInt|castFloat|castString|castBool)\\b(?=\\s*\\()"
+        },
+        {
+          "name": "support.function",
+          "match": "\\b(print|len|str|int|float|bool)\\b(?=\\s*\\()"
+        }
+      ]
+    },
+    "templateStrings": {
+      "name": "string.quoted",
+      "begin": "\\$\"",
+      "end": "\"",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.begin"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.end"
+        }
+      },
+      "patterns": [
+        {
+          "name": "constant.character.escape",
+          "match": "\\\\."
+        },
+        {
+          "name": "meta.embedded",
+          "begin": "\\{",
+          "end": "\\}",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.section.embedded.begin"
+            }
+          },
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.section.embedded.end"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#comments"
+            },
+            {
+              "include": "#builtins"
+            },
+            {
+              "include": "#constants"
+            },
+            {
+              "include": "#self"
+            },
+            {
+              "include": "#numbers"
+            },
+            {
+              "include": "#operators"
+            },
+            {
+              "include": "#variables"
+            }
+          ]
+        }
+      ]
+    },
+    "classNames": {
+      "name": "entity.name.type",
+      "match": "(?<=\\bclass\\s)[A-Za-z_][A-Za-z0-9_]*"
+    },
+    "functionDeclarations": {
+      "name": "meta.function",
+      "match": "\\b(fn)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+      "captures": {
+        "1": {
+          "name": "storage.type"
+        },
+        "2": {
+          "name": "entity.name.function"
+        }
+      }
+    },
+    "self": {
+      "name": "variable.language",
+      "match": "\\bself\\b"
+    },
+    "variables": {
+      "patterns": [
+        {
+          "name": "variable.other.property",
+          "match": "(?<=\\.)[A-Za-z_][A-Za-z0-9_]*"
+        },
+        {
+          "name": "variable.other",
+          "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b"
+        }
+      ]
+    }
+  }
+}

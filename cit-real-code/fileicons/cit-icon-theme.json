@@ -1,0 +1,12 @@
+{
+  "iconDefinitions": {
+    "_cit": {
+      "iconPath": "./cit.png"
+    }
+  },
+  "fileExtensions": {
+    "cit": "_cit",
+    "ct": "_cit",
+    "citbc.json": "_cit"
+  }
+}

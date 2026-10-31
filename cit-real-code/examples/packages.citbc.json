@@ -1,0 +1,1 @@
+{"version":2,"format":"CIT-VM-SOURCE-BUNDLE","source":"# Using packages installed with ipcit\n#\n# 1. In a terminal:      ipcit init\n# 2. Install a package:  ipcit install ./path/to/package   (registry packages come later)\n# 3. Use it below:\n\nimport \"my-package\"\nimport \"my-package\" as pkg\n\n# println(my_package.hello())\n# println(pkg.hello())\n"}

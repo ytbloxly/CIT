@@ -1,0 +1,11 @@
+# Using packages installed with ipcit
+#
+# 1. In a terminal:      ipcit init
+# 2. Install a package:  ipcit install ./path/to/package   (registry packages come later)
+# 3. Use it below:
+
+import "my-package"
+import "my-package" as pkg
+
+# println(my_package.hello())
+# println(pkg.hello())

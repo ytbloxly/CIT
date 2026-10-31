@@ -1,0 +1,22 @@
+# CIT v0.4 — no external compiler required
+println("Hello from CIT!")
+
+let mut total = 0
+total = total + 10
+total = total + 20
+total = total + 30
+
+println(total)
+println(7 // 2)
+println(-7 // 2)
+println(2 ** 3)
+println(10 % 3)
+println(total >= 60)
+
+if (total >= 60) {
+    println("Excellent!")
+} elseif (total >= 30) {
+    println("Good!")
+} else {
+    println("Keep practicing!")
+}

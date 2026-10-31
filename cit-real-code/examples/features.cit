@@ -1,0 +1,40 @@
+# CIT v0.6 feature showcase
+
+for (let i, range = 0, 5) {
+    println(i)
+}
+
+let mut total = 0
+while (total < 3) {
+    total = total + 1
+    if (total == 2) { continue }
+    println(total)
+}
+
+fn add(a, b = 1) {
+    return a + b
+}
+println(add(2))       # 3
+println(add(2, 4))    # 6
+
+let name = input("What is your name? ")
+println($"Hello, {name}!")
+
+class person() {
+    fn struct(name, age) {
+        self.name = name
+        self.age = age
+    }
+    fn talk() {
+        println($"Hello, I am {self.name}!")
+    }
+}
+let newPer = person("Adam", 23)
+newPer.talk()
+
+warnln("This is a warning")
+errorln("This is an error message")
+println(castInt("42"))
+println(castFloat("2.5"))
+println(castString(100))
+println(castBool("false"))

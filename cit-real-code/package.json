@@ -1,8 +1,8 @@
 {
   "name": "cit-language",
   "displayName": "CIT - Code Information Technology",
-  "description": "CIT language support with loops, functions, classes, terminal input, colored errorln/warnln, the ipcit package manager, and a bundled interpreter.",
-  "version": "0.7.1",
+  "description": "CIT language support with lists, do-while loops, math shortcuts, terminal input, colored errorln/warnln, the ipcit package manager, and a bundled interpreter.",
+  "version": "0.8.0",
   "publisher": "cit-language",
   "engines": {
     "vscode": "^1.80.0"

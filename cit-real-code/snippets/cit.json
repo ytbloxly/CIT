@@ -120,5 +120,42 @@
       "import \"${1:package}\" as ${2:alias}"
     ],
     "description": "Import a package under another name"
+  },
+  "CIT Do While": {
+    "prefix": "dowhile",
+    "body": [
+      "do {",
+      "\t$0",
+      "} while (${1:condition})"
+    ],
+    "description": "do-while loop"
+  },
+  "CIT Empty Variable": {
+    "prefix": "letempty",
+    "body": [
+      "let mut ${1:name}"
+    ],
+    "description": "Empty variable (must be mut)"
+  },
+  "CIT Multiple Variables": {
+    "prefix": "letmulti",
+    "body": [
+      "let ${1:a}, ${2:b} = ${3:1}, ${4:2}"
+    ],
+    "description": "Declare several variables at once"
+  },
+  "CIT List": {
+    "prefix": "list",
+    "body": [
+      "let mut ${1:nums} = [${2:1, 2, 3}]"
+    ],
+    "description": "List variable"
+  },
+  "CIT Range": {
+    "prefix": "rangef",
+    "body": [
+      "range(${1:0}, ${2:10})"
+    ],
+    "description": "range() list"
   }
 }

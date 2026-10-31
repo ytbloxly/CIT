@@ -1,1 +1,1 @@
-{"version":2,"format":"CIT-VM-SOURCE-BUNDLE","source":"int num = 2\r\nprintln(num == 2) # true\r\n\r\nclass person() {\r\n    fn struct(name, age, has_child) {\r\n        self.name = castString(name)\r\n        self.age = castInt(age)\r\n        self.has_child = castBool(has_child)\r\n    }\r\n}\r\n\r\nlet new = person(\"John\", 26, \"yes\")\r\nprintln(new.has_child)"}
+{"version":2,"format":"CIT-VM-SOURCE-BUNDLE","source":"let mut points = 0\r\npoints = points + 2\r\nprintln(points)"}

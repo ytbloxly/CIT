@@ -1,0 +1,55 @@
+# Lists, shortcuts and new loops (CIT v0.8)
+
+# Lists
+let mut nums = [1, 2, 3, 4]
+nums.append(5)
+nums.insert(0, 0)
+println(nums)            # [0, 1, 2, 3, 4, 5]
+println(nums.pop())      # 5
+nums.remove(0)
+nums.reverse()
+println(nums)            # [4, 3, 2, 1]
+println(nums.count(3), nums.index(2), len(nums))
+println(nums[0], nums[-1])
+let backup = nums.copy()
+nums.clear()
+println(nums, backup)
+
+# range(), min(), max(), sum()
+println(range(5))                 # [0, 1, 2, 3, 4]
+println(range(10, 0, -3))         # [10, 7, 4, 1]
+println(min(4, 2, 8), max([4, 2, 8]), sum(range(1, 101)))
+
+# Math shortcuts
+let mut x = 10
+x += 5
+x -= 3
+x *= 2
+x /= 4
+x **= 2
+x %= 7
+x //= 1
+println(x)
+
+# Empty variables must be `let mut`
+let mut name
+name = "Coder"
+println(name)
+
+# Multiple assignment
+let a, b, c = 2, 3, 4
+println(a, b, c)
+
+# do-while: the body always runs at least once
+let mut tries = 0
+do {
+    tries += 1
+    println($"Try {tries}")
+} while (tries < 3)
+
+# Functions and values
+fn square(n) {
+    return n * n
+}
+let result = square(12)
+println(result)

@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-0.8.0-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-0.8.1-blue">
   <img alt="Files" src="https://img.shields.io/badge/files-.cit%20%7C%20.ct-informational">
   <img alt="Editor" src="https://img.shields.io/badge/editor-VS%20Code-007ACC">
 </p>
@@ -150,12 +150,15 @@ println(castInt("42"))
 - Inferred variables (`let`), mutable variables (`let mut`) and typed declarations (`int`, `float`, `str`, `char`, `bool`).
 - **Empty variables** (`let mut name`, then `name = "Coder"`). An empty variable has to be `mut`, because otherwise it would stay empty forever.
 - **Multiple assignment**: `let a, b, c = 2, 3, 4`.
-- **Math shortcuts**: `+=`, `-=`, `*=`, `/=`, `%=`, `**=`, `//=`.
-- `if` / `elseif` / `else`, `while`, **`do { ... } while (...)`**, numeric `for` with `range`, plus `break`, `continue`, `pass` and `return`.
-- **Lists**: `[1, 2, 3]`, indexing (`nums[0]`, `nums[-1]`) and the methods `append`, `pop`, `insert`, `clear`, `remove`, `reverse`, `count`, `index` and `copy`. Changing a list needs `let mut`.
+- **Math shortcuts**: `+=`, `-=`, `*=`, `/=`, `%=`, `**=`, `//=`, and **`n++`, `++n`, `n--`, `--n`**.
+- **Control flow**: `if` / `elseif` / `else`, `while`, `do { ... } while (...)`, numeric `for` with `range`, **`for (let item in list)`** loops, **`switch` / `case`**, plus `break`, `continue`, `pass` and `return`.
+- **Lists**: `[1, 2, 3]`, indexing (`nums[0]`, `nums[-1]`) and 18 methods, including `map`, `filter`, `reduce` and `find`.
+- **Dictionaries**: `{name: "Coder", age: 24}` with `get`, `keys`, `values`, `items`, `update`, `pop`, `popitem`, `default`, `copy`, `fromkeys` and `clear`.
+- **Strings**: 18 methods such as `upper`, `lower`, `trim`, `split`, `replace`, `startPad`, `repeat` and `indexOf`.
 - **Built-in functions**: `range()`, `min()`, `max()`, `sum()` and `len()`.
-- Functions with default and named arguments. A function call can be stored in a variable (`let x = add(12)`), and a function itself can be stored too (`let f = add`).
-- Classes with `fn struct(...)` constructors and `self`.
+- **Functions** with default and named arguments. Functions are values: `let x = add(12)`, `let f = add`, **lambdas** such as `x => x * x`, `(a, b) => a + b` and `x, y => return x * y`.
+- **Classes** with `fn struct(...)` constructors and `self`, plus **inheritance**: `class builder(person())` and `super()`.
+- **Safe navigation**: `value?.method()` does nothing when the value is `null`.
 - Interpolated strings: `$"Hello, {name}!"`.
 - Operators: `+ - * / % // **`, `== != < > <= >=`, `&& || !`, and the words `and` / `or` / `not`.
 - Conversions: `castInt`, `castFloat`, `castString`, `castBool`.
@@ -178,11 +181,106 @@ nums.clear()           # []
 
 `pop()` takes the last item (or `pop(i)` for item `i`). `remove(x)` and `index(x)` stop with an error if `x` is not in the list. Without `mut`, a list can be read but not changed.
 
+### More features
+
+```
+# Dictionaries (a bare name works as the key: info[name] is info["name"])
+let mut info = {name: "Coder", work: "Coding in CIT", age: 24}
+println(info[name])                  # Coder
+info["city"] = "Warsaw"
+println(info.get("email", "none"))   # none
+for (let key in info) {
+    println($"{key}: {info[key]}")
+}
+
+# ++ and --
+let mut visits = 0
+visits++
+++visits
+println(visits)                      # 2
+
+# for-in loops and list methods with lambdas
+let nums = [1, 2, 3, 4, 5, 6]
+for (let n in nums) {
+    if (n % 2 == 0) { println(n) }
+}
+println(nums.filter(n => n > 3).map(n => n * 10))   # [40, 50, 60]
+println(nums.reduce((a, b) => a + b))               # 21
+
+# Lambdas and functions stored in variables
+let square = fn square(x) {
+    return x * x
+}
+let rectangle = x, y => return x * y
+println(square(4), rectangle(3, 5))                 # 16 15
+
+# Strings
+let s = "  Hello, CIT!  "
+println(s.trim().upper())                           # HELLO, CIT!
+println("7".startPad(3, "0"), "ab".repeat(3))       # 007 ababab
+println("a-b-c".split("-"))                         # ["a", "b", "c"]
+
+# Safe navigation: nothing happens when the value is null
+let mut p = null
+p?.talk()
+
+# Inheritance
+class person() {
+    fn struct(name, age) {
+        self.name = name
+        self.age = age
+    }
+    fn talk() {
+        println($"Hello, I am {self.name}!")
+    }
+}
+class builder(person()) {
+    fn struct(name, age, company) {
+        super().struct(name, age)
+        self.company = company
+    }
+}
+p = builder("Bob", 30, "ACME")
+p?.talk()                                           # Hello, I am Bob!
+
+# switch / case (no fall-through, several values per case)
+let tier = "premium"
+switch (tier) {
+    case "free" {
+        println("Standard content with ads.")
+    }
+    case "premium", "vip" {
+        println("High-quality content, no ads.")
+    }
+    case default {
+        println("Unknown tier.")
+    }
+}
+```
+
+### Method reference
+
+| Type | Methods |
+| --- | --- |
+| **List** | `append`, `pop`, `insert`, `clear`, `remove`, `reverse`, `count`, `index`, `copy`, `splice`, `unshift`, `shift`, `map`, `filter`, `reduce`, `slice`, `include`, `find` |
+| **Dictionary** | `get`, `keys`, `values`, `items`, `update`, `pop`, `popitem`, `default`, `copy`, `fromkeys`, `clear` |
+| **String** | `include`, `starts`, `ends`, `slice`, `substring`, `split`, `lower`, `upper`, `trim`, `replace`, `replaceAll`, `startPad`, `endPad`, `repeat`, `at`, `charAt`, `charCodeAt`, `indexOf` |
+
+Good to know:
+
+- Changing a list or dictionary needs `let mut`. Reading is always allowed.
+- Reading a dictionary key that does not exist is an error. Use `d.get(key, fallback)` to avoid it.
+- `d.default(key, value)` sets the key only if it is missing and returns the key's value. `d.fromkeys(keys, value)` returns a new dictionary and leaves `d` unchanged.
+- In `info[name]`, a bare name that is not a variable is used as the key `"name"`. Use `info["name"]` to be explicit.
+- `list.splice(start, count, ...items)` removes and inserts items and returns the removed ones. `shift()` and `unshift()` work on the front of a list.
+- `s.split()` with no separator splits on whitespace. `s.indexOf(x)` returns `-1` when `x` is not found.
+- `switch` has no fall-through: only the first matching `case` runs, and `break` ends the switch early.
+
 ### Install the VS Code extension
 
 1. Open VS Code and go to Extensions (`Ctrl+Shift+X`).
 2. Click the `...` menu and choose **Install from VSIX...**.
-3. Select `cit-language-0.8.0.vsix`.
+3. Select `cit-language-0.8.1.vsix`.
 4. Open any `.cit` or `.ct` file. VS Code selects CIT automatically.
 5. Run it with the Play button in the editor, the right-click menu, or `Ctrl+F5`.
 
@@ -373,12 +471,15 @@ println(castInt("42"))
 - Variables inferidas (`let`), variables mutables (`let mut`) y declaraciones con tipo (`int`, `float`, `str`, `char`, `bool`).
 - **Variables vacías** (`let mut name`, y luego `name = "Coder"`). Una variable vacía tiene que ser `mut`, porque si no se quedaría vacía para siempre.
 - **Asignación múltiple**: `let a, b, c = 2, 3, 4`.
-- **Atajos matemáticos**: `+=`, `-=`, `*=`, `/=`, `%=`, `**=`, `//=`.
-- `if` / `elseif` / `else`, `while`, **`do { ... } while (...)`**, `for` numérico con `range`, además de `break`, `continue`, `pass` y `return`.
-- **Listas**: `[1, 2, 3]`, índices (`nums[0]`, `nums[-1]`) y los métodos `append`, `pop`, `insert`, `clear`, `remove`, `reverse`, `count`, `index` y `copy`. Para modificar una lista hace falta `let mut`.
+- **Atajos matemáticos**: `+=`, `-=`, `*=`, `/=`, `%=`, `**=`, `//=`, y **`n++`, `++n`, `n--`, `--n`**.
+- **Control de flujo**: `if` / `elseif` / `else`, `while`, `do { ... } while (...)`, `for` numérico con `range`, bucles **`for (let item in list)`**, **`switch` / `case`**, además de `break`, `continue`, `pass` y `return`.
+- **Listas**: `[1, 2, 3]`, índices (`nums[0]`, `nums[-1]`) y 18 métodos, entre ellos `map`, `filter`, `reduce` y `find`.
+- **Diccionarios**: `{name: "Coder", age: 24}` con `get`, `keys`, `values`, `items`, `update`, `pop`, `popitem`, `default`, `copy`, `fromkeys` y `clear`.
+- **Cadenas de texto**: 18 métodos como `upper`, `lower`, `trim`, `split`, `replace`, `startPad`, `repeat` e `indexOf`.
 - **Funciones integradas**: `range()`, `min()`, `max()`, `sum()` y `len()`.
-- Funciones con argumentos por defecto y con nombre. El resultado de una función se puede guardar en una variable (`let x = add(12)`) y la propia función también (`let f = add`).
-- Clases con constructores `fn struct(...)` y `self`.
+- **Funciones** con argumentos por defecto y con nombre. Las funciones son valores: `let x = add(12)`, `let f = add`, **lambdas** como `x => x * x`, `(a, b) => a + b` y `x, y => return x * y`.
+- **Clases** con constructores `fn struct(...)` y `self`, y también **herencia**: `class builder(person())` y `super()`.
+- **Navegación segura**: `valor?.metodo()` no hace nada si el valor es `null`.
 - Cadenas interpoladas: `$"¡Hola, {name}!"`.
 - Operadores: `+ - * / % // **`, `== != < > <= >=`, `&& || !` y las palabras `and` / `or` / `not`.
 - Conversiones: `castInt`, `castFloat`, `castString`, `castBool`.
@@ -401,11 +502,106 @@ nums.clear()           # []
 
 `pop()` quita el último elemento (o `pop(i)` el elemento `i`). `remove(x)` e `index(x)` se detienen con un error si `x` no está en la lista. Sin `mut`, una lista se puede leer pero no modificar.
 
+### Más funciones
+
+```
+# Diccionarios (un nombre sin comillas sirve como clave: info[name] es info["name"])
+let mut info = {name: "Coder", work: "Coding in CIT", age: 24}
+println(info[name])                  # Coder
+info["city"] = "Warsaw"
+println(info.get("email", "none"))   # none
+for (let key in info) {
+    println($"{key}: {info[key]}")
+}
+
+# ++ and --
+let mut visits = 0
+visits++
+++visits
+println(visits)                      # 2
+
+# Bucles for-in y métodos de listas con lambdas
+let nums = [1, 2, 3, 4, 5, 6]
+for (let n in nums) {
+    if (n % 2 == 0) { println(n) }
+}
+println(nums.filter(n => n > 3).map(n => n * 10))   # [40, 50, 60]
+println(nums.reduce((a, b) => a + b))               # 21
+
+# Lambdas y funciones guardadas en variables
+let square = fn square(x) {
+    return x * x
+}
+let rectangle = x, y => return x * y
+println(square(4), rectangle(3, 5))                 # 16 15
+
+# Cadenas de texto
+let s = "  Hello, CIT!  "
+println(s.trim().upper())                           # HELLO, CIT!
+println("7".startPad(3, "0"), "ab".repeat(3))       # 007 ababab
+println("a-b-c".split("-"))                         # ["a", "b", "c"]
+
+# Navegación segura: no pasa nada si el valor es null
+let mut p = null
+p?.talk()
+
+# Herencia
+class person() {
+    fn struct(name, age) {
+        self.name = name
+        self.age = age
+    }
+    fn talk() {
+        println($"¡Hola, soy {self.name}!")
+    }
+}
+class builder(person()) {
+    fn struct(name, age, company) {
+        super().struct(name, age)
+        self.company = company
+    }
+}
+p = builder("Bob", 30, "ACME")
+p?.talk()                                           # ¡Hola, soy Bob!
+
+# switch / case (sin "fall-through", varios valores por case)
+let tier = "premium"
+switch (tier) {
+    case "free" {
+        println("Contenido estándar con anuncios.")
+    }
+    case "premium", "vip" {
+        println("Contenido de alta calidad, sin anuncios.")
+    }
+    case default {
+        println("Nivel desconocido.")
+    }
+}
+```
+
+### Referencia de métodos
+
+| Tipo | Métodos |
+| --- | --- |
+| **Lista** | `append`, `pop`, `insert`, `clear`, `remove`, `reverse`, `count`, `index`, `copy`, `splice`, `unshift`, `shift`, `map`, `filter`, `reduce`, `slice`, `include`, `find` |
+| **Diccionario** | `get`, `keys`, `values`, `items`, `update`, `pop`, `popitem`, `default`, `copy`, `fromkeys`, `clear` |
+| **Cadena** | `include`, `starts`, `ends`, `slice`, `substring`, `split`, `lower`, `upper`, `trim`, `replace`, `replaceAll`, `startPad`, `endPad`, `repeat`, `at`, `charAt`, `charCodeAt`, `indexOf` |
+
+Conviene saber:
+
+- Para modificar una lista o un diccionario hace falta `let mut`. Leer siempre se puede.
+- Leer una clave que no existe en un diccionario es un error. Usa `d.get(clave, valor_por_defecto)` para evitarlo.
+- `d.default(clave, valor)` asigna la clave solo si no existe y devuelve su valor. `d.fromkeys(claves, valor)` devuelve un diccionario nuevo y no cambia `d`.
+- En `info[name]`, un nombre sin comillas que no sea una variable se usa como la clave `"name"`. Usa `info["name"]` para ser explícito.
+- `list.splice(inicio, cantidad, ...elementos)` quita e inserta elementos y devuelve los que quitó. `shift()` y `unshift()` trabajan al principio de la lista.
+- `s.split()` sin separador divide por espacios en blanco. `s.indexOf(x)` devuelve `-1` si no encuentra `x`.
+- `switch` no tiene "fall-through": solo se ejecuta el primer `case` que coincide, y `break` termina el switch antes.
+
 ### Instalar la extensión de VS Code
 
 1. Abre VS Code y ve a Extensiones (`Ctrl+Shift+X`).
 2. Haz clic en el menú `...` y elige **Instalar desde VSIX...**.
-3. Selecciona `cit-language-0.8.0.vsix`.
+3. Selecciona `cit-language-0.8.1.vsix`.
 4. Abre cualquier archivo `.cit` o `.ct`. VS Code selecciona CIT automáticamente.
 5. Ejecútalo con el botón Play del editor, el menú contextual o `Ctrl+F5`.
 

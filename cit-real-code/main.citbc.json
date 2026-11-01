@@ -1,1 +1,1 @@
-{"version":2,"format":"CIT-VM-SOURCE-BUNDLE","source":"let mut points = 0\r\npoints = points + 2\r\nprintln(points)"}
+{"version":2,"format":"CIT-VM-SOURCE-BUNDLE","source":"str food = \"Pizza\"\r\nprintln($\"My favorite food is {food}\")"}

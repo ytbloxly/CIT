@@ -157,5 +157,70 @@
       "range(${1:0}, ${2:10})"
     ],
     "description": "range() list"
+  },
+  "CIT For In": {
+    "prefix": "forin",
+    "body": [
+      "for (let ${1:item} in ${2:items}) {",
+      "\t$0",
+      "}"
+    ],
+    "description": "for-in loop"
+  },
+  "CIT Dictionary": {
+    "prefix": "dict",
+    "body": [
+      "let mut ${1:info} = {${2:name}: ${3:\"Coder\"}, ${4:age}: ${5:24}}"
+    ],
+    "description": "Dictionary"
+  },
+  "CIT Lambda": {
+    "prefix": "lambda",
+    "body": [
+      "${1:x} => ${2:x * x}"
+    ],
+    "description": "Lambda (arrow function)"
+  },
+  "CIT Function Expression": {
+    "prefix": "fnexpr",
+    "body": [
+      "let ${1:name} = fn ${1:name}(${2:x}) {",
+      "\treturn $0",
+      "}"
+    ],
+    "description": "Function stored in a variable"
+  },
+  "CIT Switch": {
+    "prefix": "switch",
+    "body": [
+      "switch (${1:value}) {",
+      "\tcase ${2:\"a\"} {",
+      "\t\t$0",
+      "\t}",
+      "\tcase default {",
+      "\t\t",
+      "\t}",
+      "}"
+    ],
+    "description": "switch / case"
+  },
+  "CIT Class Inherit": {
+    "prefix": "classinherit",
+    "body": [
+      "class ${1:child}(${2:parent}()) {",
+      "\tfn struct(${3:args}) {",
+      "\t\tsuper().struct(${4:args})",
+      "\t\t$0",
+      "\t}",
+      "}"
+    ],
+    "description": "Class that inherits from a parent class"
+  },
+  "CIT Safe Call": {
+    "prefix": "safe",
+    "body": [
+      "${1:value}?.${2:method}()"
+    ],
+    "description": "Safe navigation (skips null)"
   }
 }

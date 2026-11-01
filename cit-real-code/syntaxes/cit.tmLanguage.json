@@ -19,10 +19,16 @@
       "include": "#declarations"
     },
     {
+      "include": "#caseDefault"
+    },
+    {
       "include": "#classNames"
     },
     {
       "include": "#functionDeclarations"
+    },
+    {
+      "include": "#functionKeyword"
     },
     {
       "include": "#builtins"
@@ -200,7 +206,7 @@
       "patterns": [
         {
           "name": "keyword.control",
-          "match": "\\b(if|elseif|else|while|do|for|range|return|break|continue|pass|import|as)\\b"
+          "match": "\\b(if|elseif|else|while|do|switch|case|in|for|range|return|break|continue|pass|import|as)\\b"
         },
         {
           "name": "keyword.operator.logical",
@@ -218,7 +224,7 @@
     },
     "self": {
       "name": "variable.language",
-      "match": "\\bself\\b"
+      "match": "\\b(self|super)\\b"
     },
     "types": {
       "name": "storage.type",
@@ -227,8 +233,24 @@
     "operators": {
       "patterns": [
         {
+          "name": "storage.type.function.arrow",
+          "match": "=>"
+        },
+        {
+          "name": "punctuation.accessor.optional",
+          "match": "\\?\\."
+        },
+        {
           "name": "keyword.operator.assignment.compound",
           "match": "\\*\\*=|//=|[+\\-*/%]="
+        },
+        {
+          "name": "keyword.operator.increment",
+          "match": "\\+\\+"
+        },
+        {
+          "name": "keyword.operator.decrement",
+          "match": "--"
         },
         {
           "name": "keyword.operator.comparison",
@@ -254,7 +276,22 @@
     },
     "listMethods": {
       "name": "support.function",
-      "match": "(?<=\\.)(append|pop|insert|clear|remove|reverse|count|index|copy)\\b(?=\\s*\\()"
+      "match": "(?<=\\.)(append|pop|insert|clear|remove|reverse|count|index|copy|splice|unshift|shift|map|filter|reduce|slice|include|find|get|keys|values|update|items|popitem|default|fromkeys|ends|starts|substring|split|lower|upper|trim|replaceAll|replace|startPad|endPad|repeat|at|charAt|charCodeAt|indexOf)\\b(?=\\s*\\()"
+    },
+    "caseDefault": {
+      "match": "\\b(case)\\s+(default)\\b",
+      "captures": {
+        "1": {
+          "name": "keyword.control"
+        },
+        "2": {
+          "name": "keyword.control"
+        }
+      }
+    },
+    "functionKeyword": {
+      "name": "storage.type",
+      "match": "\\bfn\\b"
     }
   }
 }

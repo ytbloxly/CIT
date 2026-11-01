@@ -1,4 +1,4 @@
-# CIT — Code Information Technology v0.8.0
+# CIT — Code Information Technology v0.8.1
 
 CIT is a VS Code language extension for `.cit` and `.ct` files.
 
@@ -6,7 +6,7 @@ CIT is a VS Code language extension for `.cit` and `.ct` files.
 
 1. Open VS Code Extensions (`Ctrl+Shift+X`).
 2. Open the `...` menu and choose **Install from VSIX...**.
-3. Select `cit-language-0.8.0.vsix`.
+3. Select `cit-language-0.8.1.vsix`.
 4. Open a `.cit` or `.ct` file; VS Code automatically selects CIT.
 5. Run using the editor's Play icon, the context menu, or `Ctrl+F5`.
 
@@ -19,12 +19,16 @@ F5 is only needed when developing/debugging the extension itself.
 - `println`, `errorln`, `warnln`, `input` and interpolated strings such as `$"Hello, {name}!"`.
 - Inferred variables (`let`) and mutable inferred variables (`let mut`); typed declarations.
 - Empty variables (`let mut name`, assigned later; they must be `mut`) and multiple assignment (`let a, b, c = 2, 3, 4`).
-- Math shortcuts: `+=`, `-=`, `*=`, `/=`, `%=`, `**=`, `//=`.
-- `if`, `elseif`, `else`, `while`, `do { ... } while (...)`, numeric `for`/`range` loops. The range end is exclusive: `range = 0, 3` visits 0, 1, 2.
+- Math shortcuts: `+=`, `-=`, `*=`, `/=`, `%=`, `**=`, `//=`, and `n++`, `++n`, `n--`, `--n`.
+- `if`, `elseif`, `else`, `while`, `do { ... } while (...)`, numeric `for`/`range` loops, `for (let item in list)` loops and `switch` / `case` (no fall-through, `case a, b`, `case default`). The range end is exclusive: `range = 0, 3` visits 0, 1, 2.
 - `break`, `continue`, `pass`, `return`.
 - Functions, default parameters and named arguments (`fn add(a, b = 1)` / `add(2, b: 4)`).
-- Classes, `fn struct(...)` constructors, `self` properties and methods.
-- Lists (`[1, 2, 3]`, `nums[0]`) with `append`, `pop`, `insert`, `clear`, `remove`, `reverse`, `count`, `index` and `copy`. Changing a list needs `let mut`.
+- Classes, `fn struct(...)` constructors, `self` properties and methods, and inheritance (`class builder(person())`, `super()`).
+- Lambdas (`x => x * x`, `(a, b) => a + b`, `x, y => return x * y`) and function expressions (`let f = fn f(x) { ... }`).
+- Safe navigation: `value?.method()` does nothing when the value is `null`.
+- Lists (`[1, 2, 3]`, `nums[0]`) with `append`, `pop`, `insert`, `clear`, `remove`, `reverse`, `count`, `index`, `copy`, `splice`, `unshift`, `shift`, `map`, `filter`, `reduce`, `slice`, `include` and `find`. Changing a list needs `let mut`.
+- Dictionaries (`{name: "Coder", age: 24}`, `info[name]`) with `get`, `keys`, `values`, `items`, `update`, `pop`, `popitem`, `default`, `copy`, `fromkeys` and `clear`.
+- String methods: `include`, `starts`, `ends`, `slice`, `substring`, `split`, `lower`, `upper`, `trim`, `replace`, `replaceAll`, `startPad`, `endPad`, `repeat`, `at`, `charAt`, `charCodeAt`, `indexOf`.
 - Built-ins `range()`, `min()`, `max()`, `sum()`, `len()`.
 - A function call or a function itself can be stored in a variable (`let x = add(12)`, `let f = add`).
 - `castInt`, `castFloat`, `castString`, `castBool`.
@@ -77,7 +81,7 @@ The editor toolbar uses icon-only Run, Compile and Check actions. Hover over an 
 
 ## Examples
 
-See `examples/hello.cit`, `examples/features.cit` and `examples/lists.cit`.
+See `examples/hello.cit`, `examples/features.cit`, `examples/lists.cit` and `examples/advanced.cit`.
 
 
 ## Syntax highlighting

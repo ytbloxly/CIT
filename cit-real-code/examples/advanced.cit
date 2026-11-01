@@ -1,0 +1,68 @@
+# CIT v0.8.1: dictionaries, lambdas, inheritance, switch and more
+
+# Dictionaries
+let mut info = {name: "Coder", work: "Coding in CIT", age: 24}
+println(info[name])                 # Coder
+info["city"] = "Warsaw"
+println(info.get("email", "none"), info.keys())
+for (let key in info) {
+    println($"{key}: {info[key]}")
+}
+
+# ++ and --
+let mut visits = 0
+visits++
+++visits
+println(visits--, visits)           # 2 1
+
+# for-in, lambdas and list methods
+let nums = [1, 2, 3, 4, 5, 6]
+println(nums.filter(n => n % 2 == 0).map(n => n * n))   # [4, 16, 36]
+println(nums.reduce((a, b) => a + b), nums.find(n => n > 4))
+let square = fn square(x) {
+    return x * x
+}
+let rectangle = x, y => return x * y
+println(square, rectangle, square(4), rectangle(3, 5))
+
+# Strings
+let s = "  Hello, CIT!  "
+println(s.trim().upper(), s.include("CIT"), s.indexOf("C"))
+println("7".startPad(3, "0"), "ab".repeat(3), "a-b-c".replaceAll("-", "+"))
+
+# Safe navigation
+let mut p = null
+p?.talk()                           # nothing happens
+
+# Inheritance
+class person() {
+    fn struct(name, age) {
+        self.name = name
+        self.age = age
+    }
+    fn talk() {
+        println($"Hello, I am {self.name}!")
+    }
+}
+class builder(person()) {
+    fn struct(name, age, company) {
+        super().struct(name, age)
+        self.company = company
+    }
+}
+p = builder("Bob", 30, "ACME")
+p?.talk()
+
+# switch / case
+let tier = "premium"
+switch (tier) {
+    case "free" {
+        println("Standard content with ads.")
+    }
+    case "premium", "vip" {
+        println("High-quality content, no ads.")
+    }
+    case default {
+        println("Unknown tier.")
+    }
+}

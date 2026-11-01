@@ -1,1 +1,2 @@
-let a, b, c = 2, 3, 4 # a = 2, b = 3, c = 4
+str food = "Burger"
+println($"My favorite food is {food}")

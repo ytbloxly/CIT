@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-0.8.1-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-0.8.2-blue">
   <img alt="Files" src="https://img.shields.io/badge/files-.cit%20%7C%20.ct-informational">
   <img alt="Editor" src="https://img.shields.io/badge/editor-VS%20Code-007ACC">
 </p>
@@ -94,7 +94,7 @@ if (total >= 60) {
 }
 
 # Loops (the range end is exclusive: 0, 1, 2, 3, 4)
-for (let i, range = 0, 5) {
+for (let i, range(0, 5)) {
     println(i)
 }
 
@@ -148,22 +148,18 @@ println(castInt("42"))
 ### Features
 
 - Inferred variables (`let`), mutable variables (`let mut`) and typed declarations (`int`, `float`, `str`, `char`, `bool`).
-- **Empty variables** (`let mut name`, then `name = "Coder"`). An empty variable has to be `mut`, because otherwise it would stay empty forever.
-- **Multiple assignment**: `let a, b, c = 2, 3, 4`.
-- **Math shortcuts**: `+=`, `-=`, `*=`, `/=`, `%=`, `**=`, `//=`, and **`n++`, `++n`, `n--`, `--n`**.
-- **Control flow**: `if` / `elseif` / `else`, `while`, `do { ... } while (...)`, numeric `for` with `range`, **`for (let item in list)`** loops, **`switch` / `case`**, plus `break`, `continue`, `pass` and `return`.
-- **Lists**: `[1, 2, 3]`, indexing (`nums[0]`, `nums[-1]`) and 18 methods, including `map`, `filter`, `reduce` and `find`.
-- **Dictionaries**: `{name: "Coder", age: 24}` with `get`, `keys`, `values`, `items`, `update`, `pop`, `popitem`, `default`, `copy`, `fromkeys` and `clear`.
-- **Strings**: 18 methods such as `upper`, `lower`, `trim`, `split`, `replace`, `startPad`, `repeat` and `indexOf`.
-- **Built-in functions**: `range()`, `min()`, `max()`, `sum()` and `len()`.
-- **Functions** with default and named arguments. Functions are values: `let x = add(12)`, `let f = add`, **lambdas** such as `x => x * x`, `(a, b) => a + b` and `x, y => return x * y`.
-- **Classes** with `fn struct(...)` constructors and `self`, plus **inheritance**: `class builder(person())` and `super()`.
-- **Safe navigation**: `value?.method()` does nothing when the value is `null`.
-- Interpolated strings: `$"Hello, {name}!"`.
-- Operators: `+ - * / % // **`, `== != < > <= >=`, `&& || !`, and the words `and` / `or` / `not`.
-- Conversions: `castInt`, `castFloat`, `castString`, `castBool`.
-- Comments with `#` and `/* ... */`.
-- Modules and packages with `import "name"` and `import "name" as alias`.
+- **Empty variables** (`let mut name`, then `name = "Coder"`) and **multiple assignment** (`let a, b, c = 2, 3, 4`).
+- **Math shortcuts**: `+=`, `-=`, `*=`, `/=`, `%=`, `**=`, `//=`, and `n++`, `++n`, `n--`, `--n`.
+- **Operators**: `+ - * / % // **`, `== != < > <= >=`, `&& || !`, and **`in`** for text, lists and dictionaries. (The words `and`, `or` and `not` were removed: use `&&`, `||` and `!`.)
+- **Control flow**: `if` / `elseif` / `else`, `while`, `do { ... } while (...)`, **`for (let i, range(0, 12))`** (with a step: `range(0, 12, 2)`), `for (let item in list)`, `switch` / `case`, plus `break`, `continue`, `pass` and `return`.
+- **Errors**: `try` / `catch` / `throw`, safe navigation `value?.method()`, a `fallback` for conversions (`castInt(text, fallback = 0)`), and **`defer`** to run code when a function ends.
+- **Strings**: `"text"`, `$"Hello, {name}!"`, **multi-line strings** (`"""..."""`) and 18 methods such as `upper`, `split`, `replace` and `startPad`.
+- **Lists** with 18 methods (`map`, `filter`, `reduce`, `splice`...), **dictionaries** `{name: "Coder", age: 24}` with 11 methods, and numbers with `toFixed`.
+- **Built-in functions**: `range()`, `min()`, `max()`, `sum()`, `len()` (lists, strings and dictionaries), `random()` and `randint()`.
+- **Functions** with default and named arguments, stored in variables, **lambdas** (`x => x * x`, `x, y => return x * y`) and closures.
+- **Classes** with `fn struct(...)`, `self`, **inheritance** (`class builder(person())`) and `super()`.
+- Comments with `#` and `/* ... */`, and modules with `import "name"` / `import "name" as alias`.
+- **Tools**: compile-before-run, **Format Document**, colored output, typed input in the terminal, snippets and the `ipcit` package manager.
 
 ### Lists at a glance
 
@@ -258,6 +254,58 @@ switch (tier) {
 }
 ```
 
+### Errors, defer, multi-line strings and more
+
+```
+# for loops with a step (the loop variable can be "let mut")
+for (let mut i, range(0, 12, 2)) {
+    println(i)
+}
+
+# The in operator works with text, lists and dictionaries
+str string = "Hello, CIT!"
+if ("CIT!" in string) {
+    println($"We found CIT! in {string}")
+}
+
+# try / catch / throw
+let mut info = {name: "Adam", age: 23}
+try {
+    println(info[email])
+} catch (err) {
+    warnln($"Found a bug: {err}")
+}
+try {
+    throw "Something went wrong"
+} catch (reason) {
+    println(reason)
+}
+
+# defer runs when the function ends
+fn doSomething() {
+    defer println("Prints last")
+    println("Prints first")
+}
+doSomething()
+
+# Fallback value for conversions
+let number = castInt(input("How old are you: "), fallback = 0)
+println(number)
+
+# Multi-line strings
+let menu = """
+1. Start
+2. Settings
+3. Exit
+"""
+println(menu)
+
+# Random numbers
+let secret_number = random(1, 100).toFixed(2)   # a number like 8.22
+let secret_number2 = randint(1, 100)            # a whole number from 1 to 100
+println(secret_number >= 1, secret_number2 >= 1)
+```
+
 ### Method reference
 
 | Type | Methods |
@@ -265,6 +313,7 @@ switch (tier) {
 | **List** | `append`, `pop`, `insert`, `clear`, `remove`, `reverse`, `count`, `index`, `copy`, `splice`, `unshift`, `shift`, `map`, `filter`, `reduce`, `slice`, `include`, `find` |
 | **Dictionary** | `get`, `keys`, `values`, `items`, `update`, `pop`, `popitem`, `default`, `copy`, `fromkeys`, `clear` |
 | **String** | `include`, `starts`, `ends`, `slice`, `substring`, `split`, `lower`, `upper`, `trim`, `replace`, `replaceAll`, `startPad`, `endPad`, `repeat`, `at`, `charAt`, `charCodeAt`, `indexOf` |
+| **Number** | `toFixed` |
 
 Good to know:
 
@@ -275,18 +324,29 @@ Good to know:
 - `list.splice(start, count, ...items)` removes and inserts items and returns the removed ones. `shift()` and `unshift()` work on the front of a list.
 - `s.split()` with no separator splits on whitespace. `s.indexOf(x)` returns `-1` when `x` is not found.
 - `switch` has no fall-through: only the first matching `case` runs, and `break` ends the switch early.
+- `catch (err)` receives the error message, or the exact value you gave to `throw`. Pressing `Ctrl+C` and the endless-loop guard are never caught.
+- `defer` statements run in reverse order when the function ends, even after `return` or an error. At the top level of a file they run when the program ends.
+- Named arguments can be written `name: value` or `name = value`, so `castInt(x, fallback = 0)` and `castInt(x, fallback: 0)` are the same.
+- `n.toFixed(2)` gives back a **number** (`8.2222` becomes `8.22`), so trailing zeros are not shown (`8.50` prints as `8.5`).
+- `random(a, b)` gives a decimal number from `a` to `b`; `randint(a, b)` gives a whole number and both ends can appear.
+- In a multi-line string, the line break after the opening `"""` and the one before the closing `"""` are not part of the text.
+
+### Learn CIT
+
+- The **`Look 'n learn`** folder is a 15-chapter guide that explains every function and every part of the language, with examples you can run. In VS Code, run **CIT: Open Look 'n learn (Docs)** from the Command Palette.
+- The **`examples`** folder has one runnable program for each chapter, plus a guessing game and a mini project.
 
 ### Install the VS Code extension
 
 1. Open VS Code and go to Extensions (`Ctrl+Shift+X`).
 2. Click the `...` menu and choose **Install from VSIX...**.
-3. Select `cit-language-0.8.1.vsix`.
+3. Select `cit-language-0.8.2.vsix`.
 4. Open any `.cit` or `.ct` file. VS Code selects CIT automatically.
 5. Run it with the Play button in the editor, the right-click menu, or `Ctrl+F5`.
 
 ### Running programs in the terminal
 
-Run opens a VS Code terminal named **CIT**:
+Run first **compiles** your file (typing mistakes are reported before anything runs) and then opens a VS Code terminal named **CIT**:
 
 - `println(...)` prints in the normal terminal color.
 - `warnln(...)` prints in **yellow**.
@@ -294,7 +354,7 @@ Run opens a VS Code terminal named **CIT**:
 - `input("Prompt")` is typed directly in the terminal. Press Enter to submit.
 - `Ctrl+C` stops a running program.
 
-If you have Node.js installed, you can also run `cit file.cit` from any terminal opened inside VS Code.
+Use **Format Document** (`Shift+Alt+F`) to tidy your code. If you have Node.js installed, you can also run `cit file.cit` from any terminal opened inside VS Code.
 
 ### ipcit — the CIT package manager
 
@@ -327,12 +387,13 @@ println(mp.hello())
 ```
 .
 ├── extension.js        # VS Code extension (terminal runner, ipcit terminal)
-├── runtime/            # Interpreter, ipcit and terminal colors
+├── runtime/            # Compiler/interpreter, formatter, ipcit and terminal colors
 ├── bin/                # cit and ipcit command-line tools
 ├── registry/           # ipcit package registry (packages will be added here)
 ├── syntaxes/           # Syntax highlighting
 ├── snippets/           # Code snippets
-└── examples/           # Example .cit programs
+├── examples/           # One runnable .cit program per chapter (01-hello-world.cit ... 15-mini-project.cit)
+└── Look 'n learn/      # The guide: 15 chapters that explain the whole language
 ```
 
 ---
@@ -415,7 +476,7 @@ if (total >= 60) {
 }
 
 # Bucles (el final de range es exclusivo: 0, 1, 2, 3, 4)
-for (let i, range = 0, 5) {
+for (let i, range(0, 5)) {
     println(i)
 }
 
@@ -469,22 +530,18 @@ println(castInt("42"))
 ### Características
 
 - Variables inferidas (`let`), variables mutables (`let mut`) y declaraciones con tipo (`int`, `float`, `str`, `char`, `bool`).
-- **Variables vacías** (`let mut name`, y luego `name = "Coder"`). Una variable vacía tiene que ser `mut`, porque si no se quedaría vacía para siempre.
-- **Asignación múltiple**: `let a, b, c = 2, 3, 4`.
-- **Atajos matemáticos**: `+=`, `-=`, `*=`, `/=`, `%=`, `**=`, `//=`, y **`n++`, `++n`, `n--`, `--n`**.
-- **Control de flujo**: `if` / `elseif` / `else`, `while`, `do { ... } while (...)`, `for` numérico con `range`, bucles **`for (let item in list)`**, **`switch` / `case`**, además de `break`, `continue`, `pass` y `return`.
-- **Listas**: `[1, 2, 3]`, índices (`nums[0]`, `nums[-1]`) y 18 métodos, entre ellos `map`, `filter`, `reduce` y `find`.
-- **Diccionarios**: `{name: "Coder", age: 24}` con `get`, `keys`, `values`, `items`, `update`, `pop`, `popitem`, `default`, `copy`, `fromkeys` y `clear`.
-- **Cadenas de texto**: 18 métodos como `upper`, `lower`, `trim`, `split`, `replace`, `startPad`, `repeat` e `indexOf`.
-- **Funciones integradas**: `range()`, `min()`, `max()`, `sum()` y `len()`.
-- **Funciones** con argumentos por defecto y con nombre. Las funciones son valores: `let x = add(12)`, `let f = add`, **lambdas** como `x => x * x`, `(a, b) => a + b` y `x, y => return x * y`.
-- **Clases** con constructores `fn struct(...)` y `self`, y también **herencia**: `class builder(person())` y `super()`.
-- **Navegación segura**: `valor?.metodo()` no hace nada si el valor es `null`.
-- Cadenas interpoladas: `$"¡Hola, {name}!"`.
-- Operadores: `+ - * / % // **`, `== != < > <= >=`, `&& || !` y las palabras `and` / `or` / `not`.
-- Conversiones: `castInt`, `castFloat`, `castString`, `castBool`.
-- Comentarios con `#` y `/* ... */`.
-- Módulos y paquetes con `import "nombre"` e `import "nombre" as alias`.
+- **Variables vacías** (`let mut name`, y luego `name = "Coder"`) y **asignación múltiple** (`let a, b, c = 2, 3, 4`).
+- **Atajos matemáticos**: `+=`, `-=`, `*=`, `/=`, `%=`, `**=`, `//=`, y `n++`, `++n`, `n--`, `--n`.
+- **Operadores**: `+ - * / % // **`, `== != < > <= >=`, `&& || !` y **`in`** para texto, listas y diccionarios. (Las palabras `and`, `or` y `not` se eliminaron: usa `&&`, `||` y `!`.)
+- **Control de flujo**: `if` / `elseif` / `else`, `while`, `do { ... } while (...)`, **`for (let i, range(0, 12))`** (con paso: `range(0, 12, 2)`), `for (let item in list)`, `switch` / `case`, además de `break`, `continue`, `pass` y `return`.
+- **Errores**: `try` / `catch` / `throw`, navegación segura `valor?.metodo()`, un `fallback` para conversiones (`castInt(text, fallback = 0)`) y **`defer`** para ejecutar código cuando termina una función.
+- **Cadenas de texto**: `"texto"`, `$"¡Hola, {name}!"`, **cadenas de varias líneas** (`"""..."""`) y 18 métodos como `upper`, `split`, `replace` y `startPad`.
+- **Listas** con 18 métodos (`map`, `filter`, `reduce`, `splice`...), **diccionarios** `{name: "Coder", age: 24}` con 11 métodos, y números con `toFixed`.
+- **Funciones integradas**: `range()`, `min()`, `max()`, `sum()`, `len()` (listas, cadenas y diccionarios), `random()` y `randint()`.
+- **Funciones** con argumentos por defecto y con nombre, guardadas en variables, **lambdas** (`x => x * x`, `x, y => return x * y`) y closures.
+- **Clases** con `fn struct(...)`, `self`, **herencia** (`class builder(person())`) y `super()`.
+- Comentarios con `#` y `/* ... */`, y módulos con `import "nombre"` / `import "nombre" as alias`.
+- **Herramientas**: compilación antes de ejecutar, **Formatear documento**, salida en color, entrada escrita en la terminal, fragmentos de código (snippets) y el gestor de paquetes `ipcit`.
 
 ### Listas de un vistazo
 
@@ -579,6 +636,58 @@ switch (tier) {
 }
 ```
 
+### Errores, defer, cadenas de varias líneas y más
+
+```
+# Bucles for con paso (la variable del bucle puede ser "let mut")
+for (let mut i, range(0, 12, 2)) {
+    println(i)
+}
+
+# El operador in funciona con texto, listas y diccionarios
+str string = "Hello, CIT!"
+if ("CIT!" in string) {
+    println($"¡Encontramos CIT! en {string}")
+}
+
+# try / catch / throw
+let mut info = {name: "Adam", age: 23}
+try {
+    println(info[email])
+} catch (err) {
+    warnln($"Encontré un error: {err}")
+}
+try {
+    throw "Algo salió mal"
+} catch (reason) {
+    println(reason)
+}
+
+# defer se ejecuta cuando termina la función
+fn doSomething() {
+    defer println("Se imprime al final")
+    println("Se imprime primero")
+}
+doSomething()
+
+# Valor de respaldo (fallback) para conversiones
+let number = castInt(input("¿Cuántos años tienes? "), fallback = 0)
+println(number)
+
+# Cadenas de varias líneas
+let menu = """
+1. Empezar
+2. Ajustes
+3. Salir
+"""
+println(menu)
+
+# Números aleatorios
+let secret_number = random(1, 100).toFixed(2)   # un número como 8.22
+let secret_number2 = randint(1, 100)            # un número entero de 1 a 100
+println(secret_number >= 1, secret_number2 >= 1)
+```
+
 ### Referencia de métodos
 
 | Tipo | Métodos |
@@ -586,6 +695,7 @@ switch (tier) {
 | **Lista** | `append`, `pop`, `insert`, `clear`, `remove`, `reverse`, `count`, `index`, `copy`, `splice`, `unshift`, `shift`, `map`, `filter`, `reduce`, `slice`, `include`, `find` |
 | **Diccionario** | `get`, `keys`, `values`, `items`, `update`, `pop`, `popitem`, `default`, `copy`, `fromkeys`, `clear` |
 | **Cadena** | `include`, `starts`, `ends`, `slice`, `substring`, `split`, `lower`, `upper`, `trim`, `replace`, `replaceAll`, `startPad`, `endPad`, `repeat`, `at`, `charAt`, `charCodeAt`, `indexOf` |
+| **Número** | `toFixed` |
 
 Conviene saber:
 
@@ -596,18 +706,29 @@ Conviene saber:
 - `list.splice(inicio, cantidad, ...elementos)` quita e inserta elementos y devuelve los que quitó. `shift()` y `unshift()` trabajan al principio de la lista.
 - `s.split()` sin separador divide por espacios en blanco. `s.indexOf(x)` devuelve `-1` si no encuentra `x`.
 - `switch` no tiene "fall-through": solo se ejecuta el primer `case` que coincide, y `break` termina el switch antes.
+- `catch (err)` recibe el mensaje de error, o el valor exacto que diste a `throw`. `Ctrl+C` y la protección contra bucles infinitos nunca se capturan.
+- Las instrucciones `defer` se ejecutan en orden inverso cuando termina la función, incluso tras un `return` o un error. En el nivel superior de un archivo se ejecutan cuando termina el programa.
+- Los argumentos con nombre se pueden escribir `nombre: valor` o `nombre = valor`, así que `castInt(x, fallback = 0)` y `castInt(x, fallback: 0)` son lo mismo.
+- `n.toFixed(2)` devuelve un **número** (`8.2222` pasa a `8.22`), así que los ceros finales no se muestran (`8.50` se imprime como `8.5`).
+- `random(a, b)` devuelve un número decimal de `a` a `b`; `randint(a, b)` devuelve un entero y ambos extremos pueden salir.
+- En una cadena de varias líneas, el salto de línea tras las comillas triples de apertura y el anterior a las de cierre no forman parte del texto.
+
+### Aprende CIT
+
+- La carpeta **`Look 'n learn`** es una guía de 15 capítulos que explica todas las funciones y todas las partes del lenguaje, con ejemplos que puedes ejecutar. En VS Code, ejecuta **CIT: Open Look 'n learn (Docs)** desde la paleta de comandos.
+- La carpeta **`examples`** tiene un programa ejecutable por cada capítulo, además de un juego de adivinar el número y un miniproyecto.
 
 ### Instalar la extensión de VS Code
 
 1. Abre VS Code y ve a Extensiones (`Ctrl+Shift+X`).
 2. Haz clic en el menú `...` y elige **Instalar desde VSIX...**.
-3. Selecciona `cit-language-0.8.1.vsix`.
+3. Selecciona `cit-language-0.8.2.vsix`.
 4. Abre cualquier archivo `.cit` o `.ct`. VS Code selecciona CIT automáticamente.
 5. Ejecútalo con el botón Play del editor, el menú contextual o `Ctrl+F5`.
 
 ### Ejecutar programas en la terminal
 
-Al ejecutar se abre una terminal de VS Code llamada **CIT**:
+Al ejecutar, primero se **compila** el archivo (los errores de escritura se muestran antes de que se ejecute nada) y después se abre una terminal de VS Code llamada **CIT**:
 
 - `println(...)` imprime con el color normal de la terminal.
 - `warnln(...)` imprime en **amarillo**.
@@ -615,7 +736,7 @@ Al ejecutar se abre una terminal de VS Code llamada **CIT**:
 - `input("Mensaje")` se escribe directamente en la terminal. Pulsa Enter para enviar.
 - `Ctrl+C` detiene un programa en ejecución.
 
-Si tienes Node.js instalado, también puedes ejecutar `cit archivo.cit` desde cualquier terminal abierta dentro de VS Code.
+Usa **Formatear documento** (`Shift+Alt+F`) para ordenar tu código. Si tienes Node.js instalado, también puedes ejecutar `cit archivo.cit` desde cualquier terminal abierta dentro de VS Code.
 
 ### ipcit — el gestor de paquetes de CIT
 
@@ -648,12 +769,13 @@ println(mp.hello())
 ```
 .
 ├── extension.js        # Extensión de VS Code (ejecutor en terminal, terminal de ipcit)
-├── runtime/            # Intérprete, ipcit y colores de la terminal
+├── runtime/            # Compilador/intérprete, formateador, ipcit y colores de la terminal
 ├── bin/                # Herramientas de línea de comandos cit e ipcit
 ├── registry/           # Registro de paquetes de ipcit (aquí se añadirán paquetes)
 ├── syntaxes/           # Resaltado de sintaxis
 ├── snippets/           # Fragmentos de código
-└── examples/           # Programas de ejemplo en .cit
+├── examples/           # Un programa .cit ejecutable por capítulo (01-hello-world.cit ... 15-mini-project.cit)
+└── Look 'n learn/      # La guía: 15 capítulos que explican todo el lenguaje
 ```
 
 <p align="center"><sub>Made with ♥ · Hecho con ♥</sub></p>

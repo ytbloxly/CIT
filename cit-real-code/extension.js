@@ -7,6 +7,7 @@ const os = require('os');
 const { compileBytecode, executeBytecode, tokenize, Parser } = require('./runtime/standalone');
 const ipcit = require('./runtime/ipcit');
 const { paint } = require('./runtime/ansi');
+const { formatCit, FormatError } = require('./runtime/formatter');
 
 const CANCEL = Symbol('cancel');
 
@@ -134,9 +135,22 @@ function activate(context) {
     term.writeLine(`> cit ${fsPath ? path.basename(fsPath) : e.document.fileName}`, 'dim');
 
     term.running = (async () => {
+      // Step 1: compile. Syntax errors are found here, before anything runs.
+      const name = fsPath ? path.basename(fsPath) : e.document.fileName;
+      term.writeLine(`[CIT] Compiling ${name}...`, 'dim');
+      const started = Date.now();
+      let bytecode;
       try {
-        // Compile to bundled bytecode and run on the bundled VM; no external compiler.
-        const bytecode = compileBytecode(e.document.getText());
+        bytecode = compileBytecode(e.document.getText());
+      } catch (err) {
+        report(err, e.document, line => term.writeLine(line, 'error'), diagnostics, 'Compile Error');
+        term.writeLine('[CIT] Nothing was run because the code did not compile.', 'warn');
+        return;
+      }
+      term.writeLine(`[CIT] Compiled in ${Date.now() - started} ms. Running...\n`, 'dim');
+
+      // Step 2: run the compiled program on the bundled VM (no external compiler needed).
+      try {
         await executeBytecode(
           bytecode,
           (line, kind) => term.writeLine(line, kind),   // kind: out | warn | error -> own color
@@ -186,7 +200,32 @@ function activate(context) {
     term.running = ipcitShell(term);
   });
 
-  context.subscriptions.push(runCmd, compileCmd, checkCmd, ipcitCmd, {
+  // Format Document (Shift+Alt+F)
+  const formatter = vscode.languages.registerDocumentFormattingEditProvider('cit', {
+    provideDocumentFormattingEdits(document, options) {
+      const text = document.getText();
+      let formatted;
+      try { formatted = formatCit(text, { tabSize: options.tabSize, insertSpaces: options.insertSpaces }); }
+      catch (err) {
+        vscode.window.showWarningMessage(`CIT format: ${err instanceof FormatError ? err.message : 'could not format this file.'}`);
+        return [];
+      }
+      if (formatted === text) return [];
+      const whole = new vscode.Range(document.positionAt(0), document.positionAt(text.length));
+      return [vscode.TextEdit.replace(whole, formatted)];
+    }
+  });
+
+  // Opens the "Look 'n learn" guide that ships with the extension.
+  const learnCmd = vscode.commands.registerCommand('cit.openLearn', async () => {
+    const file = path.join(context.extensionPath, "Look 'n learn", 'README.md');
+    if (!fs.existsSync(file)) { vscode.window.showWarningMessage("The Look 'n learn folder was not found."); return; }
+    const uri = vscode.Uri.file(file);
+    try { await vscode.commands.executeCommand('markdown.showPreview', uri); }
+    catch { await vscode.window.showTextDocument(uri); }
+  });
+
+  context.subscriptions.push(runCmd, compileCmd, checkCmd, ipcitCmd, formatter, learnCmd, {
     dispose: () => { if (runTerminal) runTerminal.close(); if (ipcitTerminal) ipcitTerminal.close(); }
   });
 }
@@ -222,10 +261,10 @@ async function ipcitShell(term) {
   }
 }
 
-function report(err, document, write, diagnostics) {
+function report(err, document, write, diagnostics, label = 'Error') {
   const line = Number.isInteger(err.line) ? err.line : 1;
   const column = Number.isInteger(err.column) ? err.column : 1;
-  write(`[CIT Error] Line ${line}, column ${column}: ${err.message}`);
+  write(`[CIT ${label}] Line ${line}, column ${column}: ${err.message}`);
   const start = new vscode.Position(Math.max(0, line - 1), Math.max(0, column - 1));
   const diagnostic = new vscode.Diagnostic(new vscode.Range(start, start.translate(0, 1)), err.message, vscode.DiagnosticSeverity.Error);
   diagnostic.source = 'CIT'; diagnostics.set(document.uri, [diagnostic]);

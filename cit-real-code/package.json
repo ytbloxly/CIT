@@ -1,8 +1,8 @@
 {
   "name": "cit-language",
   "displayName": "CIT - Code Information Technology",
-  "description": "CIT language support with dictionaries, lists, lambdas, inheritance, switch, terminal input, colored errorln/warnln, the ipcit package manager, and a bundled interpreter.",
-  "version": "0.8.1",
+  "description": "CIT language support: dictionaries, lists, lambdas, inheritance, try/catch, defer, formatting, terminal input, colored errorln/warnln, the ipcit package manager, a bundled interpreter and the Look 'n learn guide.",
+  "version": "0.8.2",
   "publisher": "cit-language",
   "engines": {
     "vscode": "^1.80.0"
@@ -13,7 +13,8 @@
     "onCommand:cit.runFile",
     "onCommand:cit.compileBytecode",
     "onCommand:cit.checkFile",
-    "onCommand:cit.openIpcit"
+    "onCommand:cit.openIpcit",
+    "onCommand:cit.openLearn"
   ],
   "categories": [
     "Programming Languages"
@@ -66,6 +67,11 @@
         "command": "cit.openIpcit",
         "title": "CIT: Open ipcit (Package Manager)",
         "icon": "$(package)"
+      },
+      {
+        "command": "cit.openLearn",
+        "title": "CIT: Open Look 'n learn (Docs)",
+        "icon": "$(book)"
       }
     ],
     "keybindings": [
@@ -127,6 +133,9 @@
         },
         {
           "command": "cit.openIpcit"
+        },
+        {
+          "command": "cit.openLearn"
         }
       ]
     },
@@ -136,7 +145,14 @@
         "label": "CIT File Icons",
         "path": "./fileicons/cit-icon-theme.json"
       }
-    ]
+    ],
+    "configurationDefaults": {
+      "[cit]": {
+        "editor.tabSize": 4,
+        "editor.insertSpaces": true,
+        "editor.defaultFormatter": "cit-language.cit-language"
+      }
+    }
   },
   "icon": "icon.png",
   "bin": {

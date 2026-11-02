@@ -1,0 +1,28 @@
+# 13 - Guessing game  (input, random, loops, fallback, try/catch)
+
+let secret = randint(1, 20)
+let mut attempts = 0
+let mut won = false
+
+println("I am thinking of a number from 1 to 20.")
+
+do {
+    let guess = castInt(input("Your guess: "), fallback = 0)
+    attempts++
+
+    if (guess < 1 || guess > 20) {
+        warnln("Please type a whole number from 1 to 20.")
+    } elseif (guess < secret) {
+        println("Too low!")
+    } elseif (guess > secret) {
+        println("Too high!")
+    } else {
+        won = true
+    }
+} while (!won && attempts < 6)
+
+if (won) {
+    println($"You got it in {attempts} tries!")
+} else {
+    errorln($"Out of tries. The number was {secret}.")
+}

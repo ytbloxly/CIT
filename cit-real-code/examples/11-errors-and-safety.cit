@@ -1,0 +1,75 @@
+# 11 - Errors and safety  (chapter 11)
+
+# try / catch
+let mut info = {name: "Adam", age: 23}
+
+try {
+    println(info[email])
+} catch (err) {
+    warnln($"Found a bug: {err}")
+}
+
+try {
+    println("step 1")
+    println(10 / 0)
+    println("never reached")
+} catch (e) {
+    println("Caught:", e)
+}
+println("the program goes on")
+
+# throw your own errors (any value can be thrown)
+fn withdraw(balance, amount) {
+    if (amount > balance) {
+        throw "Not enough money"
+    }
+    return balance - amount
+}
+try {
+    println(withdraw(100, 30))
+    println(withdraw(100, 500))
+} catch (reason) {
+    println("Failed:", reason)
+}
+try {
+    throw {code: 404, message: "Not found"}
+} catch (problem) {
+    println(problem[code], problem[message])
+}
+
+# Nesting and rethrowing
+try {
+    try {
+        throw "inner problem"
+    } catch (e) {
+        println("inner caught:", e)
+        throw $"{e} (rethrown)"
+    }
+} catch (e2) {
+    println("outer caught:", e2)
+}
+
+# return / break / continue work inside try and catch
+fn firstNumber(items) {
+    for (let item in items) {
+        try {
+            return castInt(item)
+        } catch (e) {
+            println("skipping", item)
+        }
+    }
+    return null
+}
+println(firstNumber(["x", "y", "42", "7"]))
+
+# Safe navigation: ?. does nothing on null
+let mut player = null
+player?.jump()
+println(player?.name)
+
+# Fallback values
+println(castInt("abc", fallback = 0), castFloat("x", fallback: 1.5))
+
+# Avoiding errors before they happen
+let scores = {ada: 10}
+println("bob" in scores, scores.get("bob", 0))

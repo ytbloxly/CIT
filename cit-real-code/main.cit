@@ -1,2 +1,126 @@
-str food = "Burger"
-println($"My favorite food is {food}")
+# Temporal variables
+
+let mut num <2s> = 2 # This variable is going to be for 2 seconds after the start of the program
+let mut num2 <30l> = 3 # This variable is going to be to after 30 lines of code (4-34)
+
+# Getting multiple variables one value
+
+let mut a, b, c = 2 # a and b and c is 2
+
+# Sets and tuples:
+
+let mut set = {1, 2, 2, 3, 1, 2} # 1, 2, 3
+let mut tuple = (1, 2, 3) # Values can't be changed
+
+# The lists, sets and tuples can have different type of values, liek string and numbers in one
+
+# math import
+import math
+
+math.ceil(3.1)
+math.floor(3.9)
+math.trunc(3.9)
+math.sqrt(16)
+math.cbrt(27)
+math.exp(1)
+math.log(100, 10)
+math.log2(8)
+
+math.sin(math.pi / 2)
+math.cos(0)
+math.tan(0)
+
+math.degrees(math.pi)
+math.radians(180)
+
+math.factorial(5)
+math.gcd(12, 18)
+math.lcm(12, 18)
+
+math.e
+math.pi
+math.tau
+math.nan
+math.inf
+
+# Placeholders
+
+let mut placeholder = _
+
+for (_, range(0, 12)) {
+    println("Hello")
+}
+
+# It just doesnt stores for loop in any variable
+
+# Encapsulation
+
+class person() {
+	fn struct(bank, pin, balance) {
+		self.bank = bank
+        protected self.pin = pin
+        private self.balance = balance
+	}
+
+    fn showCreditCardInfo() {
+		println(bank, pin, balance)
+	}
+}
+
+let mut p = person("Chase", 1234, 12.34)
+println(p)
+
+# Polymorphism
+
+class Animal() {
+    fn struct(name) {
+        self.name = name
+    }
+
+    fn make_sound() {
+        println($"{self.name} makes a generic sound.")
+    }
+}
+
+class Dog(Animal()) {
+    fn struct(name) {
+        super().struct(name)
+    }
+
+    fn make_sound() {
+        println($"{self.name} barks: Woof!")
+    }
+}
+
+class Cat(Animal()) {
+    fn struct(name) {
+        super().struct(name)
+    }
+
+    fn make_sound() {
+        println($"{self.name} meows: Meow!")
+    }
+}
+
+fn introduce_animal(animal) {
+    animal.make_sound()
+}
+
+# Użycie w praktyce
+let mut d = Dog("Rex")
+let mut c = Cat("Whiskers")
+
+introduce_animal(d)
+introduce_animal(c)
+
+# list(), tuple(), set(), dict(), frozendict()
+let mut newList = list(1, 2)
+let mut newTuple = tuple(1, 2)
+let mut newSet = set(1, 2)
+let mut newDict = dict(num1: 1, num2: 2)
+let mut newDict2 = frozendict(num1: 2, num2: 3)
+
+# Ternary
+
+let num = 2
+println("Even" if (num % 2 == 0) else "Odd")

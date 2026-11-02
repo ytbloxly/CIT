@@ -1,0 +1,46 @@
+# 04 - Strings  (chapter 4)
+
+let name = "Ada"
+let age = 36
+println("She said \"hi\"\tand left\\")
+println($"{name} is {age} years old, next year {age + 1}")
+
+# Multi-line strings
+let menu = """
+1. Start
+2. Settings
+3. Exit
+"""
+println(menu)
+
+# Indexing, length, searching
+let s = "Hello, CIT!"
+println(s[0], s[-1], len(s), "CIT" in s)
+println(s.include("CIT"), s.starts("Hell"), s.ends("!"), s.indexOf("l"), s.indexOf("zzz"))
+
+# Cutting
+println(s.slice(0, 5), s.slice(-4), s.slice(0, -1), s.substring(7, 10))
+println(s.at(0), s.at(-1), s.at(99), "[" + s.charAt(99) + "]", "A".charCodeAt(0))
+
+# Splitting and changing (strings never change; methods return new ones)
+println("a,b,c".split(","))
+println("  many   spaces  ".split())
+println("abc".split(""))
+println("Hello".lower(), "Hello".upper(), "[" + "  x  ".trim() + "]")
+println("a-b-c".replace("-", "+"), "a-b-c".replaceAll("-", "+"))
+
+# Padding and repeating
+println("7".startPad(3, "0"), "7".endPad(3, "*"), "-".repeat(10))
+let items = ["tea", "coffee", "milk"]
+let prices = [2, 5, 3]
+for (let i, range(0, 3)) {
+    println(items[i].endPad(8, ".") + castString(prices[i]).startPad(3))
+}
+
+# Chaining
+println("  Hello World  ".trim().lower().replace("world", "cit").split(" "))
+
+# Loop over characters
+for (let ch in "CIT") {
+    println(ch)
+}

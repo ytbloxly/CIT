@@ -45,8 +45,8 @@
   "CIT For Loop": {
     "prefix": "forrange",
     "body": [
-      "for (let ${1:i}, range = ${2:0}, ${3:10}) {",
-      "$\tprintln(${1:i})",
+      "for (let ${1:i}, range(${2:0}, ${3:10})) {",
+      "\tprintln(${1:i})",
       "}"
     ],
     "description": "Iterate over a numeric range (end is exclusive)"
@@ -55,7 +55,7 @@
     "prefix": "while",
     "body": [
       "while (${1:condition}) {",
-      "$\t${2:pass}",
+      "\t${2:pass}",
       "}"
     ],
     "description": "Repeat while a condition is true"
@@ -64,7 +64,7 @@
     "prefix": "fn",
     "body": [
       "fn ${1:name}(${2:a}, ${3:b = 1}) {",
-      "$\treturn ${4:a + b}",
+      "\treturn ${4:a + b}",
       "}"
     ],
     "description": "Declare a function with optional default parameters"
@@ -73,15 +73,15 @@
     "prefix": "class",
     "body": [
       "class ${1:person}() {",
-      "$\tfn struct(${2:name}, ${3:age}) {",
-      "$\t\tself.name = ${2:name}",
-      "$\t\tself.age = ${3:age}",
-      "$\t}",
+      "\tfn struct(${2:name}, ${3:age}) {",
+      "\t\tself.name = ${2:name}",
+      "\t\tself.age = ${3:age}",
+      "\t}",
       "",
       "\tfn talk() {",
-      "$\t\tprintln(\"Hello, I am talking!\")",
-      "$\t}",
-      "$}"
+      "\t\tprintln(\"Hello, I am talking!\")",
+      "\t}",
+      "}"
     ],
     "description": "Declare a class with a struct constructor and methods"
   },
@@ -222,5 +222,72 @@
       "${1:value}?.${2:method}()"
     ],
     "description": "Safe navigation (skips null)"
+  },
+  "CIT For Step": {
+    "prefix": "forstep",
+    "body": [
+      "for (let mut ${1:i}, range(${2:0}, ${3:10}, ${4:2})) {",
+      "\t$0",
+      "}"
+    ],
+    "description": "for loop with a step"
+  },
+  "CIT Try Catch": {
+    "prefix": "try",
+    "body": [
+      "try {",
+      "\t$1",
+      "} catch (${2:err}) {",
+      "\twarnln($\"${3:Found a bug}: {${2:err}}\")",
+      "}"
+    ],
+    "description": "try / catch"
+  },
+  "CIT Throw": {
+    "prefix": "throw",
+    "body": [
+      "throw ${1:\"message\"}"
+    ],
+    "description": "Raise an error"
+  },
+  "CIT Defer": {
+    "prefix": "defer",
+    "body": [
+      "defer ${1:println(\"Prints last\")}"
+    ],
+    "description": "Run a statement when the function ends"
+  },
+  "CIT Multi-line String": {
+    "prefix": "multiline",
+    "body": [
+      "let ${1:text} = \"\"\"",
+      "${2:first line}",
+      "${3:second line}",
+      "\"\"\""
+    ],
+    "description": "Multi-line string"
+  },
+  "CIT In": {
+    "prefix": "inop",
+    "body": [
+      "if (${1:\"x\"} in ${2:text}) {",
+      "\t$0",
+      "}"
+    ],
+    "description": "in operator"
+  },
+  "CIT Cast Fallback": {
+    "prefix": "castfallback",
+    "body": [
+      "castInt(${1:input(\"Number: \")}, fallback = ${2:0})"
+    ],
+    "description": "Convert with a fallback value"
+  },
+  "CIT Random": {
+    "prefix": "randint",
+    "body": [
+      "randint(${1:1}, ${2:100})"
+    ],
+    "description": "Random integer (inclusive)"
   }
 }

@@ -1,0 +1,17 @@
+# lib/greeter.cit - a module that 14-modules.cit imports
+
+let greeting = "Hello"
+
+fn greet(name) {
+    return $"{greeting}, {name}!"
+}
+
+class counter() {
+    fn struct() {
+        self.count = 0
+    }
+    fn up() {
+        self.count++
+        return self.count
+    }
+}

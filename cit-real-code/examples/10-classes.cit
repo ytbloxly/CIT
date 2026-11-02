@@ -1,0 +1,84 @@
+# 10 - Classes  (chapter 10)
+
+class person() {
+    fn struct(name, age) {
+        self.name = name
+        self.age = age
+    }
+
+    fn talk() {
+        println($"Hello, I am {self.name} and I am {self.age}.")
+    }
+}
+
+let ada = person("Ada", 36)
+ada.talk()
+ada.age++
+println(ada.name, ada.age, ada.missing)
+println(ada)
+
+# Each object has its own data
+class counter() {
+    fn struct() {
+        self.count = 0
+    }
+    fn up() {
+        self.count++
+    }
+}
+let a = counter()
+let b = counter()
+a.up()
+a.up()
+b.up()
+println(a.count, b.count)
+
+# Inheritance and super()
+class builder(person()) {
+    fn struct(name, age, company) {
+        super().struct(name, age)
+        self.company = company
+    }
+}
+let bob = builder("Bob", 30, "ACME")
+bob.talk()                       # inherited
+println(bob.name, bob.company)
+
+# Overriding, and calling the parent's version
+class animal() {
+    fn speak() {
+        println("...")
+    }
+}
+class dog(animal()) {
+    fn speak() {
+        super().speak()
+        println("Woof!")
+    }
+}
+animal().speak()
+dog().speak()
+
+# The child's version is used even inside the parent's methods
+class shape() {
+    fn name() {
+        return "a shape"
+    }
+    fn describe() {
+        println($"I am {self.name()}")
+    }
+}
+class circle(shape()) {
+    fn name() {
+        return "a circle"
+    }
+}
+shape().describe()
+circle().describe()
+
+# Safe calls with ?.
+let mut friend = null
+friend?.talk()
+println("no crash")
+friend = ada
+friend?.talk()

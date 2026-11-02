@@ -1,0 +1,20 @@
+# 01 - Hello, World!  (chapter 1: Getting started)
+# Run this file with the Play button in VS Code.
+
+println("Hello, World!")
+
+# Three ways to print, three colors
+println("normal text")
+warnln("a warning shows in yellow")
+errorln("an error shows in red")
+
+# Several values on one line
+println("Name:", "Ada", "Age:", 36)
+println()                      # an empty line
+
+/* A block comment
+   can cover many lines */
+
+# Reading input: the answer is always text
+let name = input("What is your name? ")
+println($"Nice to meet you, {name}!")

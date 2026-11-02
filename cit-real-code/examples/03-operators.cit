@@ -1,0 +1,52 @@
+# 03 - Operators  (chapter 3)
+
+# Math
+println(7 + 2, 7 - 2, 7 * 2, 7 / 2, 7 // 2, 7 % 2, 2 ** 3)
+println(-7 // 2, -7 % 3, 2 ** 3 ** 2)
+
+# Joining text and lists
+println("Hello, " + "CIT")
+println([1, 2] + [3])
+
+# Comparing
+println(3 == 3, 3 != 3, 3 < 5, 3 >= 5)
+println("a" < "b", [1, 2] == [1, 2], {a: 1} == {a: 1}, 1 == "1")
+
+# Logic: && || !
+let age = 20
+let hasTicket = true
+println(age >= 18 && hasTicket)
+println(age < 13 || age > 65)
+println(!hasTicket)
+
+# in: text, list, dictionary keys
+str string = "Hello, CIT!"
+if ("CIT!" in string) {
+    println($"We found CIT! in {string}")
+}
+println(3 in [1, 2, 3], 9 in [1, 2, 3], "name" in {name: "Ada"})
+
+# Assignment shortcuts
+let mut x = 10
+x += 5
+x -= 3
+x *= 2
+x /= 4
+x **= 2
+x %= 7
+x //= 1
+println(x)
+
+# ++ and --
+let mut n = 5
+n++
+++n
+println(n)
+println(n++, n)
+println(++n, n)
+n--
+--n
+println(n)
+
+# Precedence
+println(2 + 3 * 4, (2 + 3) * 4, -2 ** 2)

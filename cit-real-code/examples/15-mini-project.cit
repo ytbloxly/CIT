@@ -1,0 +1,63 @@
+# 15 - Mini project: a tiny grade book
+# Uses dictionaries, lists, functions, lambdas, classes, switch, try/catch and more.
+
+class student() {
+    fn struct(name) {
+        self.name = name
+        self.grades = []
+    }
+
+    fn add(grade) {
+        if (grade < 0 || grade > 100) {
+            throw $"Invalid grade: {grade}"
+        }
+        self.grades.append(grade)
+    }
+
+    fn average() {
+        if (len(self.grades) == 0) {
+            return null
+        }
+        return (sum(self.grades) / len(self.grades)).toFixed(1)
+    }
+}
+
+fn letter(avg) {
+    switch (avg // 10) {
+        case 10, 9 { return "A" }
+        case 8 { return "B" }
+        case 7 { return "C" }
+        case default { return "D" }
+    }
+}
+
+let mut book = {}
+for (let name in ["Ada", "Linus", "Grace"]) {
+    book[name] = student(name)
+}
+
+let data = {Ada: [95, 88, 100], Linus: [72, 65, 80], Grace: [85, 91, 105]}
+for (let name in data) {
+    for (let grade in data[name]) {
+        try {
+            book[name].add(grade)
+        } catch (problem) {
+            warnln($"{name}: {problem}")
+        }
+    }
+}
+
+println("Name".endPad(8) + "Average".startPad(8) + "  Grade")
+println("-".repeat(24))
+for (let name in book) {
+    let s = book[name]
+    let avg = s.average()
+    println(name.endPad(8) + castString(avg).startPad(8) + "  " + letter(avg))
+}
+
+let averages = book.values().map(s => s.average())
+let topAverage = max(averages)
+let best = book.values().find(s => s.average() == topAverage)
+println()
+println($"Best student: {best.name} with {topAverage}")
+println($"Everyone's grades: {book.values().map(s => s.grades)}")

@@ -3,9 +3,10 @@
 /*
  * CIT interpreter (tokenizer, parser, evaluator).
  *
- * v0.8.1 adds: dictionaries, ++/--, many list/dictionary/string methods,
- * for-in loops, safe navigation (?.), lambdas, class inheritance (super()),
- * and switch/case.
+ * v0.8.2 adds: multi-line strings, for (let i, range(a, b, step)), try/catch/throw,
+ * defer, the `in` operator, fallback for cast functions, random()/randint(),
+ * number.toFixed(), and a real compile step (source -> AST) before running.
+ * The words and/or/not were removed: use && || !.
  */
 
 class CITError extends Error {
@@ -22,8 +23,9 @@ const COMPOUND_OPS = ['+=', '-=', '*=', '/=', '%=', '**=', '//='];
 const TYPE_WORDS = ['int', 'float', 'str', 'char', 'bool'];
 const LITERAL_TOKENS = ['string', 'char', 'template'];
 const ASSIGNABLE = ['variable', 'member', 'index'];
+const DEFER_KINDS = ['println', 'errorln', 'warnln', 'expr', 'assign', 'block', 'if', 'while', 'dowhile', 'for', 'forin', 'switch', 'try', 'throw', 'pass'];
 const PRECEDENCE = new Map(Object.entries({
-  '||': 1, or: 1, '&&': 2, and: 2, '==': 3, '!=': 3, '<': 4, '>': 4, '<=': 4, '>=': 4,
+  '||': 1, '&&': 2, '==': 3, '!=': 3, '<': 4, '>': 4, '<=': 4, '>=': 4, in: 4,
   '+': 5, '-': 5, '*': 6, '/': 6, '//': 6, '%': 6, '**': 7
 }));
 const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
@@ -31,6 +33,19 @@ const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 /* ------------------------------------------------------------------ */
 /* Tokenizer                                                           */
 /* ------------------------------------------------------------------ */
+
+// Text of a multi-line string: the newline right after the opening quotes is dropped, and when the
+// closing quotes are on their own line, that line is dropped and its indentation is removed from every line.
+function multilineText(raw, ESC) {
+  let text = raw.replace(/\r\n/g, '\n');
+  if (text.startsWith('\n')) text = text.slice(1);
+  let lines = text.split('\n');
+  if (lines.length > 1 && /^[ \t]*$/.test(lines[lines.length - 1])) {
+    const indent = lines.pop().length;
+    if (indent) lines = lines.map(x => { let k = 0; while (k < indent && (x[k] === ' ' || x[k] === '\t')) k++; return x.slice(k); });
+  }
+  return lines.join('\n').replace(/\\([\s\S])/g, (m, ch) => ESC[ch] ?? ch);
+}
 
 function tokenize(source) {
   const out = [];
@@ -54,6 +69,22 @@ function tokenize(source) {
       continue;
     }
     const l = line, c = col;
+
+    // multi-line strings:  """ ... """   and   $""" ... """
+    if ((ch === '"' && source.startsWith('"""', i)) || (ch === '$' && source.startsWith('$"""', i))) {
+      const isTemplate = ch === '$';
+      if (isTemplate) adv();
+      adv(); adv(); adv();
+      let raw = '', ok = false;
+      while (i < source.length) {
+        if (source[i] === '\\' && i + 1 < source.length) { raw += adv(); raw += adv(); continue; }
+        if (source.startsWith('"""', i)) { adv(); adv(); adv(); ok = true; break; }
+        raw += adv();
+      }
+      if (!ok) throw new CITError('Unterminated multi-line string.', l, c);
+      add(isTemplate ? 'template' : 'string', multilineText(raw, ESC), l, c);
+      continue;
+    }
 
     if (ch === '$' && source[i + 1] === '"') {
       adv(); adv();
@@ -268,23 +299,51 @@ class Parser {
       return { kind: 'switch', subject, cases };
     }
 
+    // for (let i, range(0, 10)) { }    for (let mut i, range(0, 10, 2)) { }    for (let item in list) { }
     if (this.match('for')) {
       this.consume('(');
       this.consume('let', "Expected 'let' in for loop.");
+      const mutable = this.match('mut');
       const n = this.ident('Expected loop variable.');
-      if (this.match('in')) {                                   // for (let item in list)
+      if (this.match('in')) {
         const iter = this.expression();
         this.consume(')');
-        return { kind: 'forin', name: n.value, iter, body: this.block(), token: n };
+        return { kind: 'forin', name: n.value, mutable, iter, body: this.block(), token: n };
       }
-      this.consume(',');                                        // for (let i, range = 0, 5)
-      this.consume('range', "Expected 'range' in for loop.");
-      this.consume('=');
-      const start = this.expression();
-      this.consume(',');
-      const end = this.expression();
-      this.consume(')');
-      return { kind: 'for', name: n.value, start, end, body: this.block(), token: n };
+      this.consume(',', "Expected ',' after the loop variable: for (let i, range(0, 10)).");
+      const rt = this.consume('range', "Expected 'range(...)' in the for loop: for (let i, range(0, 10)).");
+      if (this.check('=')) {
+        throw new CITError("The for loop is now written for (let i, range(0, 10)). The old 'range = 0, 10' form is no longer supported.", rt.line, rt.column);
+      }
+      this.consume('(', "Expected '(' after range: for (let i, range(0, 10)).");
+      const args = [];
+      this.withArgs(() => { do { args.push(this.expression()); } while (this.match(',')); });
+      if (args.length > 3) throw new CITError('range() in a for loop takes 1 to 3 values: range(stop), range(start, stop) or range(start, stop, step).', rt.line, rt.column);
+      this.consume(')', "Expected ')' to close range(...).");
+      this.consume(')', "Expected ')' to close the for loop header.");
+      return { kind: 'for', name: n.value, mutable, args, body: this.block(), token: n };
+    }
+
+    // try { } catch (err) { }
+    if (this.match('try')) {
+      const body = this.block();
+      this.consume('catch', "Expected 'catch' after the try block.");
+      let name = null;
+      if (this.match('(')) { name = this.ident('Expected a name for the error, for example catch (err).'); this.consume(')'); }
+      return { kind: 'try', body, name, handler: this.block() };
+    }
+
+    if (this.check('throw') && this.cur().type === 'identifier') {
+      const t = this.cur(); this.pos++;
+      return { kind: 'throw', expr: this.expression(), token: t };
+    }
+
+    // defer <statement>: runs when the surrounding function ends
+    if (this.check('defer') && this.cur().type === 'identifier') {
+      const t = this.cur(); this.pos++;
+      const stmt = this.statement();
+      if (!DEFER_KINDS.includes(stmt.kind)) throw new CITError('defer needs a statement such as a call, an assignment or a { block }.', t.line, t.column);
+      return { kind: 'defer', stmt, token: t };
     }
 
     if (this.match('import')) {
@@ -339,7 +398,13 @@ class Parser {
     } else left = this.postfix();
     for (;;) {
       const t = this.cur();
-      const isOp = t.type === 'operator' || (t.type === 'identifier' && (t.value === 'and' || t.value === 'or'));
+      if (t.type === 'identifier' && (t.value === 'and' || t.value === 'or')) {
+        const nx = this.peek();
+        if (nx && nx.line === t.line && (['identifier', 'int', 'float', 'string', 'char', 'template'].includes(nx.type) || (nx.type === 'punctuation' && (nx.value === '(' || nx.value === '[')))) {
+          throw new CITError(`'${t.value}' is not a keyword anymore. Use ${t.value === 'and' ? '&&' : '||'} instead (for example: a ${t.value === 'and' ? '&&' : '||'} b).`, t.line, t.column);
+        }
+      }
+      const isOp = t.type === 'operator' || (t.type === 'identifier' && t.value === 'in');
       const p = isOp ? PRECEDENCE.get(t.value) : undefined;
       if (p === undefined || p < min) break;
       this.pos++;
@@ -371,7 +436,8 @@ class Parser {
         this.withArgs(() => {
           if (!this.check(')')) do {
             let name = null;
-            if (this.cur().type === 'identifier' && this.peek()?.value === ':' && !LITERAL_TOKENS.includes(this.peek().type)) { name = this.cur().value; this.pos += 2; }
+            const nx = this.peek();
+            if (this.cur().type === 'identifier' && nx && ((nx.type === 'punctuation' && nx.value === ':') || (nx.type === 'operator' && nx.value === '='))) { name = this.cur().value; this.pos += 2; }
             args.push({ name, value: this.expression() });
           } while (this.match(','));
         });
@@ -423,6 +489,13 @@ class Parser {
 
   primary() {
     const t = this.cur();
+
+    if (t.type === 'identifier' && t.value === 'not') {
+      const nx = this.peek();
+      if (nx && nx.line === t.line && ['identifier', 'int', 'float', 'string', 'char', 'template'].includes(nx.type)) {
+        throw new CITError("'not' is not a keyword anymore. Use ! instead (for example: !done).", t.line, t.column);
+      }
+    }
 
     const arrow = this.arrowAhead();
     if (arrow) {
@@ -779,18 +852,30 @@ const STRING_METHODS = {
   } }
 };
 
-const BUILTINS = new Set(['input', 'castInt', 'castFloat', 'castString', 'castBool', 'range', 'min', 'max', 'sum', 'len']);
+// toFixed(2) rounds to 2 digits after the point and gives back a number: 8.2222 -> 8.22
+const NUMBER_METHODS = {
+  toFixed: { min: 0, max: 1, run: (n, [d = 0], c) => {
+    needInt(d, 'toFixed() digits', c);
+    if (d < 0 || d > 20) throw c.err('toFixed() digits must be between 0 and 20.');
+    return Number(n.toFixed(d));
+  } }
+};
+
+const BUILTINS = new Set(['input', 'castInt', 'castFloat', 'castString', 'castBool', 'range', 'min', 'max', 'sum', 'len', 'random', 'randint']);
 
 /* ------------------------------------------------------------------ */
 /* Interpreter                                                         */
 /* ------------------------------------------------------------------ */
 
 async function run(source, output = () => {}, input = async prompt => '', options = {}) {
-  const ast = new Parser(tokenize(source)).parse();
+  const ast = options.ast || new Parser(tokenize(source)).parse();
   const global = new Env();
+  global.defers = [];
+  const rand = options.random || Math.random;
   const maxSteps = options.maxSteps || 1000000;
   let steps = 0;
-  const tick = (msg = 'Execution step limit exceeded. Possible infinite loop.') => { if (++steps > maxSteps) throw new CITError(msg); };
+  const fatal = msg => { const e = new CITError(msg); e.fatal = true; return e; };     // try/catch cannot catch these
+  const tick = (msg = 'Execution step limit exceeded. Possible infinite loop.') => { if (++steps > maxSteps) throw fatal(msg); };
   const emit = (kind, msg) => {
     const line = String(msg);
     if (kind === 'errorln') output(`[ERROR] ${line}`, 'error');
@@ -840,14 +925,36 @@ async function run(source, output = () => {}, input = async prompt => '', option
         return e.op === '-' ? -v : v;
       }
       case 'binary': {
+        if (e.op === 'in') return inOperator(e, env);
         const a = await ev(e.left, env);
-        if (e.op === '&&' || e.op === 'and') return truthy(a) && truthy(await ev(e.right, env));
-        if (e.op === '||' || e.op === 'or') return truthy(a) || truthy(await ev(e.right, env));
+        if (e.op === '&&') return truthy(a) && truthy(await ev(e.right, env));
+        if (e.op === '||') return truthy(a) || truthy(await ev(e.right, env));
         return binaryOp(e.op, a, await ev(e.right, env), e.token);
       }
       case 'call': return call(e, env);
       default: throw new CITError('Invalid expression.');
     }
+  }
+
+  // value in text / list / dictionary
+  async function inOperator(e, env) {
+    const tok = e.token;
+    const fail = msg => new CITError(msg, tok.line, tok.column);
+    let a, b;
+    if (e.left.kind === 'variable' && !env.find(e.left.name)) {       // name in info  ->  "name" in info
+      b = await ev(e.right, env);
+      if (!(b instanceof Map)) throw new CITError(`Undefined variable '${e.left.name}'.`, e.left.token.line, e.left.token.column);
+      return b.has(e.left.name);
+    }
+    a = await ev(e.left, env);
+    b = await ev(e.right, env);
+    if (typeof b === 'string') {
+      if (typeof a !== 'string') throw fail(`'in' needs text on the left side when searching inside a string (got ${typeOf(a)}).`);
+      return b.includes(a);
+    }
+    if (Array.isArray(b)) return b.some(x => valuesEqual(x, a));
+    if (b instanceof Map) return (typeof a === 'string' || typeof a === 'number' || typeof a === 'boolean') && b.has(a);
+    throw fail(`'in' needs a string, list or dictionary on the right side, not ${typeOf(b)}.`);
   }
 
   // In info[name], a bare name that is not a variable is used as the key "name".
@@ -911,6 +1018,7 @@ async function run(source, output = () => {}, input = async prompt => '', option
       if (hasOwn(DICT_METHODS, e.name)) throw new CITError(`'${e.name}' is a dictionary method. Call it like d.${e.name}(...).`, tok.line, tok.column);
       throw new CITError(`Dictionaries use d["${e.name}"] (or d[${e.name}]) to read a key, not d.${e.name}.`, tok.line, tok.column);
     }
+    if (typeof o === 'number' && hasOwn(NUMBER_METHODS, e.name)) throw new CITError(`'${e.name}' is a number method. Call it like n.${e.name}(...).`, tok.line, tok.column);
     if (typeof o === 'string' && hasOwn(STRING_METHODS, e.name)) throw new CITError(`'${e.name}' is a string method. Call it like s.${e.name}(...).`, tok.line, tok.column);
     if (typeof o !== 'object') throw new CITError(`Cannot read '${e.name}' from a ${typeOf(o)}.`, tok.line, tok.column);
     if (o.__module && !hasOwn(o, e.name)) throw new CITError(`Module '${o.__module}' has no export '${e.name}'.`, tok.line, tok.column);
@@ -957,6 +1065,7 @@ async function run(source, output = () => {}, input = async prompt => '', option
       if (Array.isArray(obj)) return invokeMethod(obj, 'list', 'Lists', LIST_METHODS, e, env);
       if (obj instanceof Map) return invokeMethod(obj, 'dictionary', 'Dictionaries', DICT_METHODS, e, env);
       if (typeof obj === 'string') return invokeMethod(obj, 'string', 'Strings', STRING_METHODS, e, env);
+      if (typeof obj === 'number') return invokeMethod(obj, 'number', 'Numbers', NUMBER_METHODS, e, env);
       if (obj === null || obj === undefined) {
         throw new CITError(`Cannot call '${callee.name}' because the value is null. Use ?. for a safe call (value?.${callee.name}()).`, tok.line, tok.column);
       }
@@ -1009,22 +1118,60 @@ async function run(source, output = () => {}, input = async prompt => '', option
     return await def.run(obj, vals, ctx);
   }
 
+  // Reads a number from a number, a bool or a plain decimal text like "42" or " 3.7 ". Anything else gives null.
+  function numberFrom(x) {
+    if (typeof x === 'number') return x;
+    if (typeof x === 'boolean') return x ? 1 : 0;
+    if (typeof x === 'string' && /^[+-]?(\d+\.?\d*|\.\d+)$/.test(x.trim())) return Number(x.trim());
+    return null;
+  }
+
   async function builtin(name, vals, tok = { line: 1, column: 1 }) {
     const err = msg => new CITError(msg, tok.line, tok.column);
-    const args = vals.map(v => v.value);
+    const named = vals.filter(v => v.name);
+    const args = vals.filter(v => !v.name).map(v => v.value);
+    const isCast = ['castInt', 'castFloat', 'castString', 'castBool'].includes(name);
+    for (const n of named) {
+      if (!isCast) throw err(`${name}() does not take named arguments ('${n.name}').`);
+      if (n.name !== 'fallback') throw err(`${name}() has no argument named '${n.name}'. It accepts: fallback.`);
+    }
+    const hasFallback = named.some(n => n.name === 'fallback');
+    const fallback = hasFallback ? named.find(n => n.name === 'fallback').value : null;
+    if (isCast && args.length !== 1) throw err(`${name}() takes 1 value (and an optional fallback) but got ${args.length}.`);
+
     switch (name) {
       case 'input': return String(await input(args.length ? format(args[0]) : ''));
-      case 'castInt': return Math.trunc(Number(args[0]));
-      case 'castFloat': return Number(args[0]);
+      case 'castInt': case 'castFloat': {
+        const n = numberFrom(args[0]);
+        if (n === null) {
+          if (hasFallback) return fallback;
+          throw err(`${name}(): cannot convert ${format(args[0], true)} (${typeOf(args[0])}) to ${name === 'castInt' ? 'an int' : 'a float'}. Use fallback = value to avoid this error.`);
+        }
+        return name === 'castInt' ? Math.trunc(n) : n;
+      }
       case 'castString': return format(args[0]);
       case 'castBool': {
         const x = args[0];
+        if (typeof x === 'boolean') return x;
         if (typeof x === 'string') {
           const z = x.trim().toLowerCase();
           if (['false', '0', 'no', 'off', ''].includes(z)) return false;
           if (['true', '1', 'yes', 'on'].includes(z)) return true;
+          if (hasFallback) return fallback;
         }
         return truthy(x);
+      }
+      case 'random': {
+        if (args.length > 2 || !args.every(x => typeof x === 'number')) throw err('random() takes up to 2 numbers: random(), random(max) or random(min, max).');
+        const [lo, hi] = args.length === 0 ? [0, 1] : args.length === 1 ? [0, args[0]] : args;
+        if (lo > hi) throw err('random(): the first number must not be larger than the second.');
+        return lo + rand() * (hi - lo);
+      }
+      case 'randint': {
+        if (args.length < 1 || args.length > 2 || !args.every(Number.isInteger)) throw err('randint() takes 1 or 2 integers: randint(max) or randint(min, max).');
+        const [lo, hi] = args.length === 1 ? [0, args[0]] : args;
+        if (lo > hi) throw err('randint(): the first number must not be larger than the second.');
+        return lo + Math.floor(rand() * (hi - lo + 1));
       }
       case 'range': {
         if (args.length < 1 || args.length > 3) throw err('range() takes 1 to 3 values: range(stop), range(start, stop) or range(start, stop, step).');
@@ -1061,6 +1208,7 @@ async function run(source, output = () => {}, input = async prompt => '', option
 
   async function invoke(fn, args, parent) {
     const local = new Env(fn.closure || parent);
+    local.defers = [];
     let pos = 0;
     for (const p of fn.params) {
       const named = args.find(a => a.name === p.name);
@@ -1071,8 +1219,24 @@ async function run(source, output = () => {}, input = async prompt => '', option
       else throw new CITError(`Missing argument '${p.name}'.`);
       local.define(p.name, v, false).param = true;   // parameters can't be reassigned, but a list passed in can be changed
     }
-    const r = await exec(fn.body, local);
-    return r && r.type === RETURN ? r.value : null;
+    return withDefers(local, async () => {
+      const r = await exec(fn.body, local);
+      return r && r.type === RETURN ? r.value : null;
+    });
+  }
+
+  // Runs `body`, then the deferred statements of `frame` (last deferred runs first), even if body failed.
+  async function withDefers(frame, body) {
+    let result = null, error = null, failed = false;
+    try { result = await body(); } catch (e) { error = e; failed = true; }
+    if (!(failed && error && error.fatal)) {
+      for (let i = frame.defers.length - 1; i >= 0; i--) {
+        const d = frame.defers[i];
+        try { await exec([d.stmt], d.env); } catch (e) { if (!failed) { error = e; failed = true; } }
+      }
+    }
+    if (failed) throw error;
+    return result;
   }
 
   // Creates an instance. For `class child(parent())` the parent's methods come first and the child's
@@ -1126,7 +1290,8 @@ async function run(source, output = () => {}, input = async prompt => '', option
     currentDir = r.dir;
     try {
       const menv = new Env(null);
-      try { await exec(new Parser(tokenize(r.source)).parse(), menv); }
+      menv.defers = [];
+      try { const mast = new Parser(tokenize(r.source)).parse(); await withDefers(menv, () => exec(mast, menv)); }
       catch (err) {
         if (err instanceof CITError && !err.inModule) {
           err.message = `In '${spec}' (line ${err.line}): ${err.message}`;
@@ -1195,7 +1360,7 @@ async function run(source, output = () => {}, input = async prompt => '', option
 
   async function exec(list, env) {
     for (const s of list) {
-      if (cancelled()) throw new CITError('Execution cancelled.');
+      if (cancelled()) throw fatal('Execution cancelled.');
       tick();
       switch (s.kind) {
         case 'empty': case 'pass': break;
@@ -1278,12 +1443,15 @@ async function run(source, output = () => {}, input = async prompt => '', option
           } while (truthy(await ev(s.condition, env)));
           break;
         case 'for': {
-          const start = Number(await ev(s.start, env)), end = Number(await ev(s.end, env));
-          if (!Number.isInteger(start) || !Number.isInteger(end)) throw new CITError('for range values must be integers.');
-          for (let i = start; i < end; i++) {
+          const vals = [];
+          for (const x of s.args) vals.push(await ev(x, env));
+          if (!vals.every(Number.isInteger)) throw new CITError('The values in range(...) must be integers.', s.token.line, s.token.column);
+          const [start, end, step] = vals.length === 1 ? [0, vals[0], 1] : vals.length === 2 ? [vals[0], vals[1], 1] : vals;
+          if (step === 0) throw new CITError('The step in range(...) cannot be 0.', s.token.line, s.token.column);
+          for (let i = start; step > 0 ? i < end : i > end; i += step) {
             tick('Loop limit exceeded.');
             const loopEnv = new Env(env);
-            loopEnv.define(s.name, i, false, 'int', s.token);
+            loopEnv.define(s.name, i, s.mutable, 'int', s.token);
             const r = await exec(s.body, loopEnv);
             if (r?.type === BREAK) break;
             if (r?.type === CONTINUE) continue;
@@ -1300,12 +1468,38 @@ async function run(source, output = () => {}, input = async prompt => '', option
           for (const item of items) {
             tick('Loop limit exceeded.');
             const loopEnv = new Env(env);
-            loopEnv.define(s.name, item, false, typeOf(item), s.token);
+            loopEnv.define(s.name, item, s.mutable, typeOf(item), s.token);
             const r = await exec(s.body, loopEnv);
             if (r?.type === BREAK) break;
             if (r?.type === CONTINUE) continue;
             if (r) return r;
           }
+          break;
+        }
+        case 'try': {
+          let r;
+          try { r = await exec(s.body, new Env(env)); }
+          catch (err) {
+            if (!(err instanceof CITError) || err.fatal) throw err;           // only normal errors are caught
+            const catchEnv = new Env(env);
+            // err is the error message, or the exact value that was thrown (throw {code: 404})
+            if (s.name) { const ev0 = err.hasThrown ? err.thrown : err.message; catchEnv.define(s.name.value, ev0, false, typeOf(ev0), s.name); }
+            r = await exec(s.handler, catchEnv);
+          }
+          if (r) return r;
+          break;
+        }
+        case 'throw': {
+          const v = await ev(s.expr, env);
+          const thrown = new CITError(format(v), s.token.line, s.token.column);
+          thrown.hasThrown = true; thrown.thrown = v;
+          throw thrown;
+        }
+        case 'defer': {
+          let frame = env;
+          while (frame && !frame.defers) frame = frame.parent;
+          if (!frame) throw new CITError('defer can only be used inside a function or at the top level of a file.', s.token.line, s.token.column);
+          frame.defers.push({ stmt: s.stmt, env });
           break;
         }
         case 'import': {
@@ -1321,15 +1515,21 @@ async function run(source, output = () => {}, input = async prompt => '', option
     return null;
   }
 
-  await exec(ast, global);
+  await withDefers(global, () => exec(ast, global));
   return global;
 }
 
-function compileBytecode(source) { return { version: 2, format: 'CIT-VM-SOURCE-BUNDLE', source }; }
+// Compiling = reading the source and building the program tree. Syntax errors are reported here,
+// before anything runs.
+function compileBytecode(source) {
+  const ast = new Parser(tokenize(source)).parse();
+  return { version: 3, format: 'CIT-VM-AST-BUNDLE', source, ast };
+}
 
 async function executeBytecode(program, output = () => {}, input = async () => '', options = {}) {
-  if (!program || program.version !== 2 || typeof program.source !== 'string') throw new CITError('Unsupported or invalid CIT bytecode bundle.');
-  return run(program.source, output, input, options);
+  if (!program || typeof program.source !== 'string' || (program.version !== 2 && program.version !== 3)) throw new CITError('Unsupported or invalid CIT bytecode bundle.');
+  const useAst = program.version === 3 && Array.isArray(program.ast);
+  return run(program.source, output, input, useAst ? { ...options, ast: program.ast } : options);
 }
 
 module.exports = { CITError, tokenize, Parser, run, compileBytecode, executeBytecode };

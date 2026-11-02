@@ -1,0 +1,78 @@
+# 09 - Functions  (chapter 9)
+
+fn greet(name, greeting = "Hello") {
+    return $"{greeting}, {name}!"
+}
+println(greet("Ada"))
+println(greet("Ada", "Welcome"))
+println(greet(greeting: "Hi", name: "Bo"))
+println(greet("Cy", greeting = "Yo"))
+
+# The result of a call can go into a variable
+fn square(x) {
+    return x * x
+}
+let result = square(12)
+println(result)
+
+# Recursion
+fn factorial(n) {
+    if (n <= 1) {
+        return 1
+    }
+    return n * factorial(n - 1)
+}
+println(factorial(5))
+
+# Functions are values
+let f = square
+println(f(7), f)
+fn applyTwice(fn2, value) {
+    return fn2(fn2(value))
+}
+println(applyTwice(square, 3))
+
+# Lambdas
+let inc = x => x + 1
+let add = (a, b) => a + b
+let rectangle = x, y => return x * y
+let describe = n => {
+    if (n > 0) { return "positive" }
+    return "not positive"
+}
+println(inc(1), add(2, 3), rectangle(3, 4), describe(-5))
+let cube = fn cube(x) {
+    return x * x * x
+}
+println(cube, rectangle, cube(3))
+
+# Closures
+fn makeCounter() {
+    let mut count = 0
+    return () => {
+        count++
+        return count
+    }
+}
+let next = makeCounter()
+println(next(), next(), next())
+
+# defer: runs when the function ends, last deferred first
+fn doSomething() {
+    defer println("Prints last")
+    println("Prints first")
+}
+doSomething()
+
+fn process(ok) {
+    defer println("clean up")
+    if (!ok) {
+        return "stopped early"
+    }
+    println("working...")
+    return "finished"
+}
+println(process(false))
+println(process(true))
+
+defer println("Goodbye! (top-level defer runs when the program ends)")

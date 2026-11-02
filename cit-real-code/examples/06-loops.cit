@@ -1,0 +1,48 @@
+# 06 - Loops  (chapter 6)
+
+# while
+let mut countdown = 3
+while (countdown > 0) {
+    println(countdown)
+    countdown--
+}
+println("Liftoff!")
+
+# do-while: the body always runs at least once
+let mut tries = 0
+do {
+    tries++
+    println($"Try {tries}")
+} while (tries < 3)
+
+# for with range: the end is not included
+for (let i, range(0, 5)) {
+    println(i)
+}
+
+# steps (and let mut to change the variable inside)
+for (let mut i, range(0, 12, 2)) {
+    println("step", i)
+}
+for (let i, range(10, 0, -3)) {
+    println("down", i)
+}
+
+# for-in: lists, text, dictionary keys
+for (let num in [1, 2, 3, 4]) {
+    println(num)
+}
+let ages = {Ada: 36, Linus: 54}
+for (let name in ages) {
+    println(name, "is", ages[name])
+}
+for (let pair in ages.items()) {
+    println(pair[0], "->", pair[1])
+}
+
+# break, continue, pass
+for (let i, range(0, 10)) {
+    if (i == 3) { continue }
+    if (i == 6) { break }
+    println("kept", i)
+}

@@ -1,0 +1,58 @@
+# 07 - Lists  (chapter 7)
+
+let mut nums = [1, 2, 3, 4]
+println(nums, len(nums), nums[0], nums[-1])
+
+# Changing a list needs let mut
+nums[0] = 100
+nums[-1] += 5
+nums.append(5)
+nums.insert(1, 50)
+println(nums.unshift(-1))
+println(nums)
+println(nums.pop(), nums.pop(0), nums.shift())
+nums.remove(50)
+println(nums)
+
+# splice: remove and insert anywhere
+let mut list = [1, 2, 3, 4, 5]
+println(list.splice(1, 2), list)
+list.splice(1, 0, "x", "y")
+println(list)
+list.splice(-2)
+println(list)
+
+# Searching
+let fruits = ["apple", "banana", "apple", "cherry"]
+println(fruits.count("apple"), fruits.index("cherry"), fruits.include("kiwi"), "banana" in fruits)
+
+# Parts and copies
+let digits = [0, 1, 2, 3, 4, 5]
+println(digits.slice(1, 3), digits.slice(-2), digits.slice(2), digits + [6])
+let mut a = [1, 2]
+let mut b = a              # same list, two names
+b.append(3)
+println(a)
+let mut c = a.copy()       # independent copy
+c.append(4)
+println(a, c)
+
+# map, filter, reduce, find
+let values = [1, 2, 3, 4, 5, 6]
+println(values.map(n => n * 10))
+println(values.filter(n => n % 2 == 0))
+println(values.find(n => n > 4))
+println(values.reduce((x, y) => x + y))
+println(values.reduce((x, y) => x * y, 1))
+println(["a", "b"].map((item, i) => $"{i}:{item}"))
+println(range(1, 11).filter(n => n % 2 == 0).map(n => n * n).reduce((x, y) => x + y))
+
+# Helpers
+println(len(values), min(values), max(values), sum(values), sum(range(1, 101)))
+
+# reverse and clear
+let mut r = [1, 2, 3]
+r.reverse()
+println(r)
+r.clear()
+println(r)

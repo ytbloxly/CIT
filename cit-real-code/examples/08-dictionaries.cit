@@ -1,0 +1,49 @@
+# 08 - Dictionaries  (chapter 8)
+
+let mut info = {name: "Coder", work: "Coding in CIT", age: 24}
+println(info)
+println(info[name])               # a bare name works as the key
+println(info["work"])
+
+# Add, update, math shortcuts (needs let mut)
+info["age"] = 25
+info[city] = "Warsaw"
+info["age"]++
+println(info)
+
+# Safe reading
+println("email" in info, len(info))
+println(info.get("email", "unknown"))
+
+# Looping goes through the keys
+for (let key in info) {
+    println(key, "=", info[key])
+}
+
+# Methods
+println(info.keys())
+println(info.values())
+println(info.items())
+
+let mut settings = {volume: 5}
+settings.update({volume: 8, theme: "dark"})
+println(settings)
+println(settings.default("volume", 1), settings.default("lang", "en"))
+println(settings.pop("theme"), settings.pop("nothing", "n/a"))
+println(settings.popitem(), settings)
+
+let mut copy = info.copy()
+copy.clear()
+println(copy, len(info))
+println({}.fromkeys(["a", "b"], 0))
+
+# Counting words
+let mut counts = {}
+for (let word in "the cat and the hat and the bat".split()) {
+    counts[word] = counts.get(word, 0) + 1
+}
+println(counts)
+
+# Nested data
+let person = {name: "Ada", tags: ["math", "code"], address: {city: "London"}}
+println(person[tags][1], person[address][city])

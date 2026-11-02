@@ -1,0 +1,22 @@
+# 12 - Built-in functions  (chapter 12)
+
+# Printing
+println("a", 1, true, [1, 2], {k: "v"}, null)
+
+# Converting
+println(castInt("42"), castInt("3.9"), castInt(2.7), castInt(true))
+println(castFloat("2.5"), castString(42) + "!", castBool("yes"), castBool(0))
+println(castInt("abc", fallback = -1), castBool("maybe", fallback = false))
+
+# Numbers
+println(range(5), range(2, 6), range(0, 10, 3), range(5, 0, -2))
+println(min(4, 2, 8), max([5, 3, 9]), min("pear", "apple"))
+println(sum([1, 2, 3]), sum(1, 2, 3), sum([]), sum(range(1, 101)))
+println(len("héllo"), len([1, 2, 3]), len({a: 1, b: 2}))
+
+# Random numbers (different every time you run this)
+println(random())                       # 0 to 1
+println(random(1, 100))                 # 1 to 100, with decimals
+println(random(1, 100).toFixed(2))      # rounded to 2 digits
+println(randint(1, 6))                  # a whole number, 1 to 6
+println(8.2222.toFixed(2), 8.2288.toFixed(2), 3.14159.toFixed(3))

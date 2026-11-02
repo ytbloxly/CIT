@@ -1,0 +1,63 @@
+# 05 - Conditions  (chapter 5)
+
+# if / elseif / else
+let temperature = 25
+if (temperature > 30) {
+    println("It is hot")
+} elseif (temperature > 15) {
+    println("It is nice")
+} else {
+    println("It is cold")
+}
+
+# Combining conditions
+let age = 17
+let hasParent = true
+if (age >= 18 || (age >= 12 && hasParent)) {
+    println("You can enter")
+}
+
+# switch / case: no fall-through, several values per case, default anywhere
+let userTier = "premium"
+
+switch (userTier) {
+  case "free" {
+    println("Access to standard content with ads.")
+    break
+  }
+
+  case "premium" {
+    println("Access to high-quality content, no ads.")
+    break
+  }
+
+  case "vip" {
+    println("Access to all content, live events, and premium support.")
+    break
+  }
+
+  case default {
+    println("Unknown subscription tier. Please log in.")
+  }
+}
+
+for (let day in ["Mon", "Sat", "Sun", "Xyz"]) {
+    switch (day) {
+        case "Sat", "Sun" {
+            println(day, "-> weekend")
+        }
+        case "Mon" {
+            println(day, "-> start of the week")
+        }
+        case default {
+            println(day, "-> not a day I know")
+        }
+    }
+}
+
+# switch works with calculations too
+switch (85 // 10) {
+    case 10, 9 { println("Grade A") }
+    case 8 { println("Grade B") }
+    case default { println("Keep practicing") }
+}

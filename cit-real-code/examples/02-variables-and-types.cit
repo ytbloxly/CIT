@@ -1,0 +1,49 @@
+# 02 - Variables and types  (chapter 2)
+
+# let = fixed, let mut = can change
+let language = "CIT"
+let mut score = 0
+score = score + 10
+println(language, score)
+
+# Types are worked out for you
+println(42, 3.14, "text", 'c', true, null)
+
+# Typed variables
+int age = 23
+float price = 9.99
+str title = "CIT"
+char grade = 'A'
+bool done = false
+println(age, price, title, grade, done)
+
+# Empty variables must be let mut; the first value decides the type
+let mut nickname
+println(nickname)
+nickname = "Coder"
+println(nickname)
+
+# Several variables at once
+let a, b, c = 2, 3, 4
+println(a, b, c)
+let first = "one"
+let second = "two"
+let swappedFirst, swappedSecond = second, first
+println(swappedFirst, swappedSecond)
+
+# Scope: a variable lives inside its { } block
+let x = "outer"
+if (true) {
+    let x = "inner"
+    println(x)
+}
+println(x)
+
+# Truthy and falsy: false, null, 0, "", [] and {} are false
+for (let value in [0, "", [], {}, null, "text", [0], 1]) {
+    if (value) {
+        println(value, "-> true")
+    } else {
+        println(value, "-> false")
+    }
+}

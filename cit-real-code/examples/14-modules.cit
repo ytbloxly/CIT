@@ -1,0 +1,16 @@
+# 14 - Modules  (chapter 13)
+# import runs another file and gives you what it declares.
+
+import "./lib/greeter" as greeter
+
+println(greeter.greet("Ada"))
+println(greeter.greeting)
+
+let c = greeter.counter()
+c.up()
+println(c.up())
+
+# Packages installed with ipcit are imported by name:
+#   ipcit init
+#   ipcit install ./path/to/package
+#   import "package-name"

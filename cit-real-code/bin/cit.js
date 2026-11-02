@@ -4,7 +4,7 @@
 // and input("...") reads from the terminal.
 const fs = require('fs');
 const path = require('path');
-const { run, CITError } = require('../runtime/standalone');
+const { compileBytecode, executeBytecode, CITError } = require('../runtime/standalone');
 const { resolveModule } = require('../runtime/ipcit');
 const { paint } = require('../runtime/ansi');
 
@@ -39,7 +39,19 @@ function input(prompt) {
 }
 
 const abs = path.resolve(file);
-run(fs.readFileSync(abs, 'utf8'),
+
+// Step 1: compile. Syntax errors are reported here, before anything runs.
+let program;
+try {
+  program = compileBytecode(fs.readFileSync(abs, 'utf8'));
+} catch (err) {
+  if (err instanceof CITError) console.error(paint('error', `[CIT Compile Error] Line ${err.line}, column ${err.column}: ${err.message}`, color));
+  else console.error(paint('error', `[CIT] ${err.stack || err}`, color));
+  process.exit(1);
+}
+
+// Step 2: run.
+executeBytecode(program,
   (line, kind) => console.log(paint(kind, line, color)),
   input,
   { baseDir: path.dirname(abs), resolveModule }

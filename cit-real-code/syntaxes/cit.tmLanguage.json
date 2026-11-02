@@ -7,6 +7,12 @@
       "include": "#comments"
     },
     {
+      "include": "#tripleTemplateStrings"
+    },
+    {
+      "include": "#tripleStrings"
+    },
+    {
       "include": "#templateStrings"
     },
     {
@@ -206,11 +212,7 @@
       "patterns": [
         {
           "name": "keyword.control",
-          "match": "\\b(if|elseif|else|while|do|switch|case|in|for|range|return|break|continue|pass|import|as)\\b"
-        },
-        {
-          "name": "keyword.operator.logical",
-          "match": "\\b(and|or|not)\\b"
+          "match": "\\b(if|elseif|else|while|do|switch|case|in|try|catch|throw|defer|for|range|return|break|continue|pass|import|as)\\b"
         }
       ]
     },
@@ -220,7 +222,7 @@
     },
     "builtins": {
       "name": "support.function",
-      "match": "\\b(println|errorln|warnln|input|castInt|castFloat|castString|castBool|range|min|max|sum|len)\\b(?=\\s*\\()"
+      "match": "\\b(println|errorln|warnln|input|castInt|castFloat|castString|castBool|range|min|max|sum|len|random|randint)\\b(?=\\s*\\()"
     },
     "self": {
       "name": "variable.language",
@@ -276,7 +278,7 @@
     },
     "listMethods": {
       "name": "support.function",
-      "match": "(?<=\\.)(append|pop|insert|clear|remove|reverse|count|index|copy|splice|unshift|shift|map|filter|reduce|slice|include|find|get|keys|values|update|items|popitem|default|fromkeys|ends|starts|substring|split|lower|upper|trim|replaceAll|replace|startPad|endPad|repeat|at|charAt|charCodeAt|indexOf)\\b(?=\\s*\\()"
+      "match": "(?<=\\.)(append|pop|insert|clear|remove|reverse|count|index|copy|splice|unshift|shift|map|filter|reduce|slice|include|find|get|keys|values|update|items|popitem|default|fromkeys|ends|starts|substring|split|lower|upper|trim|replaceAll|replace|startPad|endPad|repeat|at|charAt|charCodeAt|indexOf|toFixed)\\b(?=\\s*\\()"
     },
     "caseDefault": {
       "match": "\\b(case)\\s+(default)\\b",
@@ -292,6 +294,83 @@
     "functionKeyword": {
       "name": "storage.type",
       "match": "\\bfn\\b"
+    },
+    "tripleTemplateStrings": {
+      "name": "string.quoted.triple",
+      "begin": "\\$\"\"\"",
+      "end": "\"\"\"",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.begin"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.end"
+        }
+      },
+      "patterns": [
+        {
+          "name": "constant.character.escape",
+          "match": "\\\\."
+        },
+        {
+          "name": "meta.embedded",
+          "begin": "\\{",
+          "end": "\\}",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.definition.template-expression.begin"
+            }
+          },
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.template-expression.end"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#constants"
+            },
+            {
+              "include": "#builtins"
+            },
+            {
+              "include": "#listMethods"
+            },
+            {
+              "include": "#self"
+            },
+            {
+              "include": "#numbers"
+            },
+            {
+              "include": "#operators"
+            }
+          ]
+        }
+      ]
+    },
+    "tripleStrings": {
+      "name": "string.quoted.triple",
+      "begin": "\"\"\"",
+      "end": "\"\"\"",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.begin"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.end"
+        }
+      },
+      "patterns": [
+        {
+          "name": "constant.character.escape",
+          "match": "\\\\."
+        }
+      ]
     }
   }
 }

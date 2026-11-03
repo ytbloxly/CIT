@@ -1,4 +1,4 @@
-# CIT — Code Information Technology v0.8.3
+# CIT 1 Gen — Code Information Technology v1.0.0
 
 CIT is a small, readable programming language with its own VS Code extension, a built-in compiler and interpreter, a formatter and a package manager. Files end in `.cit` or `.ct`.
 
@@ -6,7 +6,7 @@ CIT is a small, readable programming language with its own VS Code extension, a 
 
 1. Open VS Code Extensions (`Ctrl+Shift+X`).
 2. Open the `...` menu and choose **Install from VSIX...**.
-3. Select `cit-language-0.8.3.vsix`.
+3. Select `cit-language-1.0.0.vsix`.
 4. Open a `.cit` or `.ct` file; VS Code automatically selects CIT.
 5. Run using the editor's Play icon, the context menu, or `Ctrl+F5`.
 
@@ -19,18 +19,19 @@ F5 is only needed when developing/debugging the extension itself.
 
 ## What the language has
 
-- Variables: `let`, `let mut`, typed (`int`, `float`, `str`, `char`, `bool`), empty variables (`let mut name`), multiple assignment (`let a, b, c = 2, 3, 4`) and shared values (`let mut a, b, c = 2`).
+- Variables: `let`, `let mut`, typed (`int`, `float`, `str`, `char`, `bool`), fixed-width storage types, `const`, static variables, empty variables (`let mut name`), destructuring, multiple assignment and shared values.
 - Operators: `+ - * / % // **`, comparisons, `&&` `||` `!`, the `in` operator, shortcuts (`+=`, `-=`, `*=`, `/=`, `%=`, `**=`, `//=`) and `n++` `++n` `n--` `--n`. (`and`, `or`, `not` were removed.)
 - Control flow: `if` / `elseif` / `else`, ternary expressions, `switch` / `case`, `while`, `do { } while ( )`, `for` with optional bindings, `break`, `continue`, `pass`, `return`.
 - Strings: `"text"`, `$"Hello, {name}!"`, multi-line `"""..."""`, and 18 string methods.
 - Lists, dictionaries, heterogeneous sets and immutable tuples; constructors include `list`, `tuple`, `set`, `dict`, `frozendict` and `frozenset`.
 - Functions with default and named arguments (`name: value` or `name = value`), lambdas (`x => x * x`), closures, function values, `defer`.
-- Classes with `fn struct(...)`, `self`, inheritance, `super()`, and `private` / `protected` fields; decorated functions and enums.
+- Classes with `fn struct(...)`, `self`, inheritance, `super()`, `private` / `protected` fields, getters/setters, and final classes; decorated functions and enums.
 - Errors: `try` / `catch` / typed `except` / `finally`, `raise`, safe navigation and conversion fallbacks.
-- Modules: `import math`, `import ui`, multiple imports, local/package imports and the `ipcit` package manager.
+- Modules: `math`, `ui`, `ui-style`, `json`, and `time`; multiple/from imports, local/package imports and the `ipcit` package manager.
 - Math and utility functions: `printf`, `exchange`, `task.wait`, `zip`, `enumerate`, `type`, `round`, `id`, `isinstance`, `issubclass`, `bin` and `square`.
-- Temporal variables expire after `<Ns>` seconds or `<Nl>` source lines.
-- UI elements render in a basic HTML-style VS Code webview; `open(..., "write"/"append")` saves UTF-8 text files.
+- Temporal variables expire after `<Nr>` reads, `<Ns>` seconds or `<Nl>` source lines. Seconds can use `offline` (time since last read) or `stopUse` (VS Code window inactivity).
+- UI elements and CSS-like style rules render in an HTML-style VS Code webview; `open(..., "write"/"append")` saves UTF-8 text files.
+- `longString(value)` converts a value to text; ordinary strings have no size limit unless an `sN` width is declared. `longNumber` uses JavaScript numbers and does not provide arbitrary-precision integers.
 
 ## Running
 
@@ -63,7 +64,7 @@ Use **Format Document** (`Shift+Alt+F`) to tidy a file: indentation (follows you
 | **CIT: Open ipcit (Package Manager)** | the `ipcit>` terminal |
 | **CIT: Open Look 'n learn (Docs)** | the guide |
 
-The toolbar shows icon-only Run, Compile and Check actions; hover an icon to see its tooltip.
+The toolbar shows icon-only Run, Compile and Check actions; hover an icon to see its tooltip. Hover supported language symbols for definitions and use **Go to Definition** (`F12` or `Ctrl+Click`) for declarations in the current file.
 
 ## ipcit — the CIT package manager
 

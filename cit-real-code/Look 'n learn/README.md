@@ -1,6 +1,6 @@
 # Look 'n learn
 
-Welcome! This folder explains **everything** in the CIT programming language, one chapter at a time. Every example in these pages is a real program: it was run, and the output you see is the real output.
+Welcome to **CIT 1 Gen**! This folder explains the language one chapter at a time. Examples are intended to be copied into `.cit` files and run with the bundled interpreter.
 
 New to programming? Start at chapter 1 and read in order. Already know another language? Skim the chapters or jump to the [cheat sheet](15-cheat-sheet.md).
 

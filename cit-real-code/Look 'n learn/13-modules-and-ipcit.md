@@ -50,13 +50,15 @@ Things to know:
 
 A working example is in the `examples` folder: `14-modules.cit`.
 
-### Built-in modules and multiple imports
+### Built-in modules, named imports, and multiple imports
 
-The standard `math` and `ui` modules do not need to be installed:
+The standard `math`, `ui`, `ui-style`, `json`, and `time` modules do not need to be installed:
 
 ```cit
 import math
 println(math.sqrt(16))
+import pi from math
+println(pi)
 ```
 
 Import several packages or built-in modules in one statement:
@@ -70,6 +72,24 @@ import {
 ```
 
 The `...` is an optional visual placeholder; list the actual module names you want to import.
+
+`json` converts between CIT values and JSON text. JSON objects load as CIT dictionaries:
+
+```cit
+import json
+let text = json.dumps({name: "Ada", score: 10}, indent = 2, sortKeys = true)
+let data = json.loads(text)
+println(data["name"])
+```
+
+`json.dump(value, file)` and `json.load(file)` write/read JSON through a file opened with `open(...)`.
+
+The `time` module provides `time()`, `ctime()`, `perfCounter()`, `localtime()`, `gmtime()`, `asctime()`, `strftime()` and `strptime()`:
+
+```cit
+import time
+println(time.strftime("%Y-%m-%d", time.localtime()))
+```
 
 ## Packages and `ipcit`
 

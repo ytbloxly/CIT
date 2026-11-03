@@ -156,10 +156,14 @@ function needSpace(p, c) {
 
 function renderTokens(toks) {
   classify(toks);
-  for (let i = 1; i + 3 < toks.length; i++) {
+  for (let i = 0; i + 3 < toks.length; i++) {
     if (toks[i].text === '<' && /^\d+$/.test(toks[i + 1].text)
-      && ['s', 'l'].includes(toks[i + 2].text) && toks[i + 3].text === '>') {
-      for (let j = i; j <= i + 3; j++) toks[j].temporal = true;
+      && ['s', 'l', 'r'].includes(toks[i + 2].text)) {
+      let end = i + 3;
+      if (toks[end]?.text === '=') end += 2;
+      if (toks[end]?.text === '>') {
+        for (let j = i; j <= end; j++) toks[j].temporal = true;
+      }
     }
   }
   let out = '';

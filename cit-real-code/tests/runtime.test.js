@@ -7,6 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 const { compileBytecode, executeBytecode } = require('../runtime/standalone');
+const { formatCit } = require('../runtime/formatter');
 
 async function evaluate(source) {
   const output = [];
@@ -22,6 +23,12 @@ test('parses dictionaries spread across lines and preserves set literals', async
 let names = {"first", "second"}
 println(values["first"], values["second"], names)`), [
       ['1 2 {"first", "second"}', 'out']
+  ]);
+});
+
+test('parses booleans and collections inside println calls before UI selectors', async () => {
+  assert.deepEqual(await evaluate('println("a", 1, true, [1, 2], {k: "v"}, null)'), [
+    ['a 1 true [1, 2] {k: "v"} null', 'out']
   ]);
 });
 
@@ -97,4 +104,53 @@ fn app(ui.title = "My App") {
 app().render()`), [
     ['My App\nHello\nParagraph', 'out']
   ]);
+});
+
+test('property accessors can update fields from nested control-flow scopes', async () => {
+  assert.deepEqual(await evaluate(`class Account() {
+    protected let mut balance = 0
+    get fn balance() { return self.balance }
+    set fn balance(value) {
+        if (value >= 0) { self.balance = value }
+    }
+}
+let mut account = Account()
+account.balance = 10
+println(account.balance)
+account.balance = -3
+println(account.balance)`), [
+    ['10', 'out'],
+    ['10', 'out']
+  ]);
+});
+
+test('connected UI styles are collected and passed to the renderer', async () => {
+  const rendered = [];
+  await executeBytecode(compileBytecode(`import ui
+import ui-style
+fn app(ui.title = "Style Test") {
+    style.connect("basic")
+    return [ui.h1("Hello")]
+}
+fn basic(style.title = "basic") {
+    return [body { color = "red" }]
+}
+app().render()`), () => {}, async () => '', {
+    renderUI: (tree, title, styles) => rendered.push({ tree, title, styles })
+  });
+  assert.deepEqual(rendered, [{
+    tree: [{ __ui: true, tag: 'h1', attrs: {}, children: ['Hello'] }],
+    title: 'Style Test',
+    styles: [{ selector: 'body', properties: { color: 'red' } }]
+  }]);
+});
+
+test('temporal modes are restricted to seconds and formatter preserves temporal syntax', async () => {
+  await assert.rejects(evaluate('let mut value <2r = offline> = 1'), /only be used with seconds/);
+  assert.equal(formatCit('let mut a <5r> = 1\nlet mut b <5s=offline> = 2\nlet mut c <5s = stopUse> = 3'), [
+    'let mut a <5r> = 1',
+    'let mut b <5s=offline> = 2',
+    'let mut c <5s=stopUse> = 3',
+    ''
+  ].join('\n'));
 });

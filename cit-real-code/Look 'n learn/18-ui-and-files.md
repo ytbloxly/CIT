@@ -17,7 +17,43 @@ fn app(ui.title = "My App") {
 app().render()
 ```
 
-Available elements: `h1`, `h2`, `h3`, `h4`, `h5`, `h6`, `title`, `header` and `p`. Their children are rendered as text, not executable HTML.
+Available elements: `h1` through `h6`, `title`, `header`, `p`, `button`, `slider`, `div`, `select`, `option`, `tile` and `input`. Named arguments become HTML attributes:
+
+```cit
+ui.input(type = "email", required, min = 12, max = 24)
+ui.button("Continue", class = "primary")
+```
+
+Children are rendered as escaped text, not executable HTML. The preview intentionally does not run scripts or event handlers.
+
+## Style a UI
+
+Define a style by giving a function a `style.title`, connect it from the app function, and return selector blocks:
+
+```cit
+import ui-style
+
+fn app(ui.title = "Styled App") {
+    style.connect("myStyle")
+    return [ui.h1("A styled heading")]
+}
+
+fn myStyle(style.title = "myStyle") {
+    return [
+        body {
+            backgroundColor = "#f4f4f4"
+            textColor = "#222222"
+        }
+        h1 {
+            fontSize = 32
+        }
+    ]
+}
+
+app().render()
+```
+
+The renderer accepts a limited, sanitized CSS-like property set. Length values such as `fontSize`, `padding`, `width` and `height` are expressed as numbers or CSS strings.
 
 ## Save UTF-8 text
 

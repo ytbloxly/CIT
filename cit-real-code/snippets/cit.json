@@ -426,5 +426,108 @@
       "task.wait(${1:2})"
     ],
     "description": "Pause a program for a number of seconds"
+  },
+  "CIT Read-limited Variable": {
+    "prefix": "temporalread",
+    "body": [
+      "let mut ${1:name} <${2:5}r> = ${3:value}"
+    ],
+    "description": "Expire a variable after a number of reads"
+  },
+  "CIT Offline Variable": {
+    "prefix": "temporaloffline",
+    "body": [
+      "let mut ${1:name} <${2:5}s = offline> = ${3:value}"
+    ],
+    "description": "Expire a variable after a period without reads"
+  },
+  "CIT Inactive Variable": {
+    "prefix": "temporalstopuse",
+    "body": [
+      "let mut ${1:name} <${2:5}s = stopUse> = ${3:value}"
+    ],
+    "description": "Expire a variable after VS Code is inactive"
+  },
+  "CIT Guard": {
+    "prefix": "guard",
+    "body": [
+      "guard (${1:condition}) else {",
+      "\t${2:return null}",
+      "}"
+    ],
+    "description": "Exit early unless a condition is true"
+  },
+  "CIT For Else": {
+    "prefix": "forelse",
+    "body": [
+      "for (let ${1:item} in ${2:items}) {",
+      "\tif (${3:condition}) {",
+      "\t\tbreak",
+      "\t}",
+      "} else {",
+      "\t${0:println(\"No matching item\")}",
+      "}"
+    ],
+    "description": "Run the else block if the loop completes without break"
+  },
+  "CIT Property Accessors": {
+    "prefix": "accessors",
+    "body": [
+      "get fn ${1:value}() {",
+      "\treturn self.${1:value}",
+      "}",
+      "",
+      "set fn ${1:value}(value) {",
+      "\tself.${1:value} = value",
+      "}"
+    ],
+    "description": "Define a class property getter and setter"
+  },
+  "CIT From Import": {
+    "prefix": "fromimport",
+    "body": [
+      "import ${1:pi} from ${2:math}"
+    ],
+    "description": "Import a named value from a module"
+  },
+  "CIT JSON Import": {
+    "prefix": "json",
+    "body": [
+      "import json",
+      "let ${1:text} = json.dumps(${2:value}, indent = 2, sortKeys = true)",
+      "let ${3:copy} = json.loads(${1:text})"
+    ],
+    "description": "Serialize and parse JSON data"
+  },
+  "CIT Time Import": {
+    "prefix": "time",
+    "body": [
+      "import time",
+      "println(time.strftime(\"${1:%Y-%m-%d %H:%M:%S}\", time.localtime()))"
+    ],
+    "description": "Use the built-in time module"
+  },
+  "CIT Fixed Width Variable": {
+    "prefix": "fixedwidth",
+    "body": [
+      "int ${1:name}: i32 = ${2:0}"
+    ],
+    "description": "Declare an integer with a fixed-width storage constraint"
+  },
+  "CIT UI Style": {
+    "prefix": "uistyle",
+    "body": [
+      "import ui-style",
+      "",
+      "fn ${1:myStyle}(style.title = \"${2:My Style}\") {",
+      "\treturn [",
+      "\t\tbody {",
+      "\t\t\tbackgroundColor = \"${3:#ffffff}\"",
+      "\t\t\ttextColor = \"${4:#222222}\"",
+      "\t\t}",
+      "\t]",
+      "}"
+    ],
+    "description": "Define a CSS-like style for a UI webview"
   }
 }

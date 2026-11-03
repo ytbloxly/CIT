@@ -25,6 +25,9 @@
       "include": "#declarations"
     },
     {
+      "include": "#temporal"
+    },
+    {
       "include": "#caseDefault"
     },
     {
@@ -192,9 +195,13 @@
         },
         {
           "name": "storage.type",
-          "match": "\\b(let|class)\\b"
+          "match": "\\b(let|class|const|static)\\b"
         }
       ]
+    },
+    "temporal": {
+      "name": "storage.modifier.temporal",
+      "match": "<\\s*[0-9]+\\s*[slr](?:\\s*=\\s*(?:offline|stopUse))?\\s*>"
     },
     "functionDeclarations": {
       "match": "\\b(fn)\\s+([A-Za-z_][A-Za-z0-9_]*)",
@@ -226,7 +233,7 @@
       "patterns": [
         {
           "name": "keyword.control",
-          "match": "\\b(if|elseif|else|while|do|switch|case|in|try|catch|except|finally|throw|raise|defer|for|range|return|break|continue|pass|import|as|with|enum|private|protected)\\b"
+          "match": "\\b(if|elseif|else|while|do|switch|case|in|try|catch|except|finally|throw|raise|defer|for|range|return|break|continue|pass|import|as|with|enum|private|protected|public|final|get|set|guard)\\b"
         }
       ]
     },
@@ -236,7 +243,7 @@
     },
     "builtins": {
       "name": "support.function",
-      "match": "\\b(println|printf|errorln|warnln|input|castInt|castFloat|castString|castBool|range|min|max|sum|len|random|randint|list|tuple|set|dict|frozendict|frozenset|object|bin|zip|enumerate|enumarate|round|id|type|isinstance|issubclass|square|exchange|open|sleep)\\b(?=\\s*\\()"
+      "match": "\\b(println|printf|errorln|warnln|input|castInt|castFloat|castString|castBool|range|min|max|sum|len|random|randint|list|tuple|set|dict|frozendict|frozenset|object|bin|zip|enumerate|enumarate|round|id|type|isinstance|issubclass|square|exchange|open|sleep|union|intersection|difference|symmetricDifference|longString|longNumber|hex|hsl|hsv|rgb|rgba|clr)\\b(?=\\s*\\()"
     },
     "self": {
       "name": "variable.language",
@@ -244,7 +251,7 @@
     },
     "types": {
       "name": "storage.type",
-      "match": "\\b(int|float|str|char|bool)\\b(?=\\s+[A-Za-z_])"
+      "match": "\\b(int|float|str|char|bool|i8|i16|i32|i64|f8|f16|f32|f64|s8|s16|s32|s64|b8|b16)\\b(?=\\s+[A-Za-z_])"
     },
     "operators": {
       "patterns": [

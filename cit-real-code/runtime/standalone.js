@@ -5,8 +5,7 @@ const path = require('path');
 /*
  * CIT interpreter (tokenizer, parser, evaluator).
  *
- * v0.8.3 adds temporal variables, sets/tuples, math/UI modules, typed errors,
- * decorators, enums, UTF-8 files, and additional built-ins.
+ * CIT 1 adds temporal variables, sets/tuples, modules, errors, UI and additional built-ins.
  * The words and/or/not were removed: use && || !.
  */
 
@@ -21,14 +20,15 @@ class CITError extends Error {
 }
 
 const BREAK = Symbol('break'), CONTINUE = Symbol('continue'), RETURN = Symbol('return');
-const COMPOUND_OPS = ['+=', '-=', '*=', '/=', '%=', '**=', '//='];
+const COMPOUND_OPS = ['+=', '-=', '*=', '/=', '%=', '**=', '//=', '|=', '&=', '^='];
 const TYPE_WORDS = ['int', 'float', 'str', 'char', 'bool'];
+const WIDTH_TYPES = /^(?:f(?:8|16|32|64)|i(?:8|16|32|64)|s(?:8|16|32|64)|b(?:8|16))$/;
 const LITERAL_TOKENS = ['string', 'char', 'template'];
-const ASSIGNABLE = ['variable', 'member', 'index'];
+const ASSIGNABLE = ['variable', 'member', 'index', 'pattern'];
 const DEFER_KINDS = ['println', 'errorln', 'warnln', 'expr', 'assign', 'block', 'if', 'while', 'dowhile', 'for', 'forin', 'switch', 'try', 'throw', 'pass'];
 const PRECEDENCE = new Map(Object.entries({
-  '||': 1, '&&': 2, '==': 3, '!=': 3, '<': 4, '>': 4, '<=': 4, '>=': 4, in: 4,
-  '+': 5, '-': 5, '*': 6, '/': 6, '//': 6, '%': 6, '**': 7
+  '||': 1, '&&': 2, '|': 3, '^': 4, '&': 5, '==': 6, '!=': 6, '<': 7, '>': 7, '<=': 7, '>=': 7, in: 7,
+  '+': 8, '-': 8, '*': 9, '/': 9, '//': 9, '%': 9, '**': 10
 }));
 const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 const TUPLE = Symbol('CIT tuple');
@@ -39,6 +39,54 @@ const mathGcd = (left, right) => {
   while (right) [left, right] = [right, left % right];
   return left;
 };
+
+function toJsonValue(value, seen = new WeakSet()) {
+  if (value === null || typeof value !== 'object') return value;
+  if (seen.has(value)) throw new TypeError('Cannot serialize a circular value.');
+  seen.add(value);
+  let converted;
+  if (value instanceof Map) converted = Object.fromEntries([...value].map(([key, item]) => [String(key), toJsonValue(item, seen)]));
+  else if (value instanceof Set || Array.isArray(value)) converted = [...value].map(item => toJsonValue(item, seen));
+  else if (value.kind === 'function' || value.kind === 'class' || value.__module) throw new TypeError(`Cannot serialize a ${typeOf(value)}.`);
+  else converted = Object.fromEntries(Object.entries(value).map(([key, item]) => [key, toJsonValue(item, seen)]));
+  seen.delete(value);
+  return converted;
+}
+
+function sortJsonKeys(value) {
+  if (Array.isArray(value)) return value.map(sortJsonKeys);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.keys(value).sort().map(key => [key, sortJsonKeys(value[key])]));
+  }
+  return value;
+}
+
+function fromJsonValue(value) {
+  if (Array.isArray(value)) return value.map(fromJsonValue);
+  if (value && typeof value === 'object') return new Map(Object.entries(value).map(([key, item]) => [key, fromJsonValue(item)]));
+  return value;
+}
+
+function timeFromStruct(value) {
+  if (!value || typeof value !== 'object') throw new TypeError('Expected a time structure.');
+  const fields = ['year', 'month', 'day', 'hour', 'minute', 'second'];
+  for (const field of fields) if (!Number.isInteger(value[field])) throw new TypeError(`Time structure needs integer '${field}'.`);
+  return new Date(value.year, value.month - 1, value.day, value.hour, value.minute, value.second);
+}
+
+function parseTime(text, format, tok) {
+  if (typeof text !== 'string' || typeof format !== 'string') throw new CITError('time.strptime() needs a text and a format string.', tok.line, tok.column);
+  const fields = [];
+  const pattern = format.replace(/([.*+?^${}()|[\]\\])/g, '\\$1').replace(/%([YmdHMS])/g, (_, field) => {
+    fields.push(field);
+    return field === 'Y' ? '(\\d{4})' : '(\\d{1,2})';
+  });
+  const match = new RegExp(`^${pattern}$`).exec(text);
+  if (!match) throw new CITError('time.strptime(): text does not match the format.', tok.line, tok.column);
+  const values = { Y: 1900, m: 1, d: 1, H: 0, M: 0, S: 0 };
+  fields.forEach((field, index) => { values[field] = Number(match[index + 1]); });
+  return { year: values.Y, month: values.m, day: values.d, hour: values.H, minute: values.M, second: values.S, weekday: 0, yearday: 1, isdst: false };
+}
 
 /* ------------------------------------------------------------------ */
 /* Tokenizer                                                           */
@@ -140,19 +188,21 @@ function tokenize(source) {
     if (/[A-Za-z_]/.test(ch)) {
       let v = '';
       while (/[A-Za-z0-9_]/.test(source[i] || '')) v += adv();
+      if (v === 'ui' && source.startsWith('-style', i)) { for (let j = 0; j < 6; j++) v += adv(); }
       add('identifier', v, l, c);
       continue;
     }
 
     const three = source.slice(i, i + 3);
     if (three === '**=' || three === '//=') { adv(); adv(); adv(); add('operator', three, l, c); continue; }
+    if (['|=', '&=', '^='].includes(source.slice(i, i + 2))) { adv(); adv(); add('operator', source.slice(i - 2, i), l, c); continue; }
     if (three === '...') { adv(); adv(); adv(); add('punctuation', three, l, c); continue; }
     const two = source.slice(i, i + 2);
     if (['==', '!=', '<=', '>=', '&&', '||', '**', '//', '+=', '-=', '*=', '/=', '%=', '++', '--', '=>'].includes(two)) {
       adv(); adv(); add('operator', two, l, c); continue;
     }
     if (two === '?.') { adv(); adv(); add('punctuation', '?.', l, c); continue; }
-    if ('+-*/%<>=!'.includes(ch)) { adv(); add('operator', ch, l, c); continue; }
+    if ('+-*/%<>=!|&^'.includes(ch)) { adv(); add('operator', ch, l, c); continue; }
     if ('(){}[];,.:@'.includes(ch)) { adv(); add('punctuation', ch, l, c); continue; }
     if (ch === '$') { adv(); add('punctuation', '$', l, c); continue; }
     throw new CITError(`Unexpected character '${ch}'.`, l, c);
@@ -202,13 +252,31 @@ class Parser {
 
   condition() { this.consume('('); const c = this.expression(); this.consume(')'); return c; }
 
+  selectorAhead() {
+    const first = this.cur();
+    if (!(first.type === 'identifier' || first.type === 'operator' && first.value === '*')) return false;
+    if (['if', 'elseif', 'else', 'for', 'while', 'switch', 'return', 'throw', 'raise', 'class', 'fn'].includes(first.value)) return false;
+    for (let i = this.pos; i < this.tokens.length && this.tokens[i].line === first.line; i++) {
+      if (this.tokens[i].value === '{') return true;
+      if (['(', ')', '=', '=>'].includes(this.tokens[i].value)) return false;
+    }
+    return false;
+  }
+
+  selectorBlock() {
+    const token = this.cur();
+    let selector = '';
+    while (!this.check('{') && this.cur().type !== 'eof') selector += this.tokens[this.pos++].value;
+    return { kind: 'styleSelector', selector, body: this.block(), token };
+  }
+
   params() {
     this.consume('(');
     const params = [];
     this.withArgs(() => {
       if (!this.check(')')) do {
         const p = this.ident('Expected parameter name.');
-        const name = p.value === 'ui' && this.match('.') ? `ui.${this.ident('Expected title after ui.').value}` : p.value;
+        const name = ['ui', 'style'].includes(p.value) && this.match('.') ? `${p.value}.${this.ident(`Expected a title after ${p.value}.`).value}` : p.value;
         let def = null;
         if (this.match('=')) def = this.expression();
         params.push({ name, default: def });
@@ -222,21 +290,39 @@ class Parser {
   // let [mut] name = value
   // let [mut] a, b, c = 1, 2, 3          (multiple variables)
   declaration() {
-    this.consume('let');
+    const token = this.consume('let');
     const mutable = this.match('mut');
-    const names = [this.ident('Expected variable name after let.')];
-    while (this.match(',')) names.push(this.ident("Expected another variable name after ','."));
+    let pattern = null;
+    const names = [];
+    if (this.match('[')) {
+      pattern = [];
+      while (!this.check(']')) {
+        if (this.match(',')) { pattern.push(null); continue; }
+        const name = this.ident('Expected a variable name in the destructuring pattern.');
+        names.push(name); pattern.push(name);
+        if (!this.match(',')) break;
+      }
+      if (this.match(',')) pattern.push(null);
+      this.consume(']', "Expected ']' after the destructuring pattern.");
+      if (!names.length) throw new CITError('A destructuring pattern needs at least one variable.', token.line, token.column);
+    } else {
+      names.push(this.ident('Expected variable name after let.'));
+      while (this.match(',')) names.push(this.ident("Expected another variable name after ','."));
+    }
     let temporal = null;
     if (this.match('<')) {
       const duration = this.cur();
-      if (duration.type !== 'int' || !this.tokens[this.pos + 1] || !['s', 'l'].includes(this.tokens[this.pos + 1].value)) {
-        throw new CITError("Expected a temporal duration such as '<2s>' or '<30l>'.", duration.line, duration.column);
+      if (duration.type !== 'int' || !this.tokens[this.pos + 1] || !['s', 'l', 'r'].includes(this.tokens[this.pos + 1].value)) {
+        throw new CITError("Expected a temporal duration such as '<2s>', '<30l>' or '<5r>'.", duration.line, duration.column);
       }
       this.pos++;
       temporal = { amount: duration.value, unit: this.cur().value };
       this.pos++;
+      if (this.match('=')) temporal.mode = this.ident("Expected a temporal mode such as 'offline' or 'stopUse'.").value;
       this.consume('>', "Expected '>' after the temporal duration.");
       if (temporal.amount <= 0) throw new CITError('A temporal duration must be greater than 0.', duration.line, duration.column);
+      if (temporal.mode && !['offline', 'stopUse'].includes(temporal.mode)) throw new CITError("Temporal modes must be 'offline' or 'stopUse'.", duration.line, duration.column);
+      if (temporal.mode && temporal.unit !== 's') throw new CITError("Temporal modes 'offline' and 'stopUse' can only be used with seconds ('s').", duration.line, duration.column);
     }
     const first = names[0];
     const list = names.map(n => n.value).join(', ');
@@ -245,24 +331,37 @@ class Parser {
       if (!mutable) {
         throw new CITError(`'${list}' has no value, so it must be declared with 'let mut'. Example: let mut ${list}`, first.line, first.column);
       }
-      return { kind: 'declare', names, mutable, exprs: null, temporal };
+      return { kind: 'declare', names, pattern, mutable, exprs: null, temporal, token };
     }
     const exprs = [this.expression()];
     while (this.match(',')) exprs.push(this.expression());
     if (exprs.length !== names.length && !(exprs.length === 1 && names.length > 1)) {
       throw new CITError(`Expected ${names.length} value${names.length === 1 ? '' : 's'} for ${list} but found ${exprs.length}.`, first.line, first.column);
     }
-    return { kind: 'declare', names, mutable, exprs, temporal, broadcast: exprs.length === 1 && names.length > 1 };
+    return { kind: 'declare', names, pattern, mutable, exprs, temporal, broadcast: exprs.length === 1 && names.length > 1, token };
   }
 
   statement() {
     if (this.match(';')) return { kind: 'empty' };
+    if (this.match('static')) {
+      if (!this.check('let')) throw new CITError("'static' must be followed by a variable declaration.", this.cur().line, this.cur().column);
+      return { ...this.declaration(), isStatic: true };
+    }
+    if (this.match('const')) {
+      const name = this.ident("Expected a constant name after 'const'.");
+      this.consume('=', "Expected '=' after the constant name.");
+      return { kind: 'declare', names: [name], pattern: null, mutable: false, exprs: [this.expression()], temporal: null, broadcast: false, token: name };
+    }
     if (this.check('private') || this.check('protected')) {
       const visibility = this.cur().value;
       const modifier = this.cur(); this.pos++;
       const statement = this.statement();
+      if (statement.kind === 'declare') {
+        statement.visibility = visibility;
+        return statement;
+      }
       if (statement.kind !== 'assign' || statement.target.kind !== 'member' || statement.target.object.kind !== 'variable' || statement.target.object.name !== 'self') {
-        throw new CITError(`${visibility} can only be used on a self field assignment inside a class.`, modifier.line, modifier.column);
+        throw new CITError(`${visibility} can only be used on a class field or self field assignment.`, modifier.line, modifier.column);
       }
       statement.visibility = visibility;
       return statement;
@@ -290,18 +389,51 @@ class Parser {
       return decorated;
     }
 
+    if (this.match('final')) {
+      if (!this.match('class')) throw new CITError("'final' must be followed by a class declaration.", this.cur().line, this.cur().column);
+      const n = this.ident('Expected class name.');
+      this.consume('(');
+      let parent = null;
+      if (!this.check(')')) {
+        parent = this.ident('Expected the parent class name.');
+        if (this.match('(')) this.consume(')', 'Write the parent class as parent() with empty parentheses.');
+      }
+      this.consume(')');
+      return { kind: 'class', name: n.value, parent, body: this.block(), token: n, final: true };
+    }
+
     if (this.cur().type === 'identifier' && TYPE_WORDS.includes(this.cur().value)) {
       const type = this.cur().value; this.pos++;
       const n = this.ident();
+      let width = null;
+      if (this.match(':')) {
+        const widthToken = this.ident('Expected a storage width such as f16 or i32.');
+        if (!WIDTH_TYPES.test(widthToken.value) || widthToken.value[0] !== type[0]) {
+          throw new CITError(`Storage width '${widthToken.value}' does not match type '${type}'.`, widthToken.line, widthToken.column);
+        }
+        width = widthToken.value;
+      }
       this.consume('=');
-      return { kind: 'typed', name: n.value, type, expr: this.expression(), token: n };
+      return { kind: 'typed', name: n.value, type, width, expr: this.expression(), token: n };
     }
 
     if (this.match('fn')) {
       const n = this.ident('Expected function name.');
       const params = this.params();
       const title = params.find(p => p.name === 'ui.title');
-      return { kind: 'function', name: n.value, params: params.filter(p => p.name !== 'ui.title'), uiTitle: title?.default || null, body: this.block(), token: n };
+      const styleTitle = params.find(p => p.name === 'style.title');
+      return { kind: 'function', name: n.value, params: params.filter(p => !['ui.title', 'style.title'].includes(p.name)), uiTitle: title?.default || null, styleTitle: styleTitle?.default || null, body: this.block(), token: n };
+    }
+
+    if (this.check('get') || this.check('set')) {
+      const accessor = this.cur().value; this.pos++;
+      this.consume('fn', `Expected 'fn' after '${accessor}'.`);
+      const n = this.ident(`Expected a property name after '${accessor} fn'.`);
+      const params = this.params();
+      if ((accessor === 'get' && params.length) || (accessor === 'set' && params.length !== 1)) {
+        throw new CITError(`A ${accessor}ter must take ${accessor === 'get' ? 'no parameters' : 'exactly one parameter'}.`, n.line, n.column);
+      }
+      return { kind: 'function', name: n.value, params, body: this.block(), token: n, accessor };
     }
 
     // class name() { ... }     class child(parent()) { ... }
@@ -314,7 +446,13 @@ class Parser {
         if (this.match('(')) this.consume(')', 'Write the parent class as parent() with empty parentheses.');
       }
       this.consume(')');
-      return { kind: 'class', name: n.value, parent, body: this.block(), token: n };
+      return { kind: 'class', name: n.value, parent, body: this.block(), token: n, final: false };
+    }
+
+    if (this.match('guard')) {
+      const condition = this.condition();
+      this.consume('else', "Expected 'else' after the guard condition.");
+      return { kind: 'guard', condition, body: this.block() };
     }
 
     if (this.match('if')) {
@@ -372,7 +510,9 @@ class Parser {
       if (this.match('in')) {
         const iter = this.expression();
         this.consume(')');
-        return { kind: 'forin', name: n.value, mutable, iter, body: this.block(), token: n };
+        const body = this.block();
+        const otherwise = this.match('else') ? this.block() : null;
+        return { kind: 'forin', name: n.value, mutable, iter, body, otherwise, token: n };
       }
       this.consume(',', "Expected ',' after the loop variable: for (let i, range(0, 10)).");
       const rt = this.consume('range', "Expected 'range(...)' in the for loop: for (let i, range(0, 10)).");
@@ -385,7 +525,9 @@ class Parser {
       if (args.length > 3) throw new CITError('range() in a for loop takes 1 to 3 values: range(stop), range(start, stop) or range(start, stop, step).', rt.line, rt.column);
       this.consume(')', "Expected ')' to close range(...).");
       this.consume(')', "Expected ')' to close the for loop header.");
-      return { kind: 'for', name: n.value, mutable, args, body: this.block(), token: n };
+      const body = this.block();
+      const otherwise = this.match('else') ? this.block() : null;
+      return { kind: 'for', name: n.value, mutable, args, body, otherwise, token: n };
     }
 
     // try { } catch (err) { } except ValueError as err { } finally { }
@@ -434,6 +576,12 @@ class Parser {
 
     if (this.match('import')) {
       const t = this.cur();
+      if (this.cur().type === 'identifier' && this.peek()?.value === 'from') {
+        const name = this.cur(); this.pos++;
+        this.consume('from');
+        const module = this.ident('Expected a module name after from.');
+        return { kind: 'fromImport', name: name.value, module: module.value, token: t };
+      }
       if (this.match('{')) {
         const names = [];
         while (!this.check('}')) {
@@ -444,7 +592,7 @@ class Parser {
         this.consume('}', "Expected '}' to close the import list.");
         return { kind: 'importMany', names, token: t };
       }
-      if (t.type !== 'string' && !(t.type === 'identifier' && ['math', 'ui'].includes(t.value))) throw new CITError("Expected a package or file name after 'import'.", t.line, t.column);
+      if (t.type !== 'string' && !(t.type === 'identifier' && ['math', 'ui', 'json', 'time', 'ui-style'].includes(t.value))) throw new CITError("Expected a package or file name after 'import'.", t.line, t.column);
       this.pos++;
       let alias = null;
       if (this.match('as')) alias = this.ident("Expected a name after 'as'.").value;
@@ -459,6 +607,8 @@ class Parser {
     if (this.match('pass')) return { kind: 'pass' };
     if (this.check('{')) return { kind: 'block', body: this.block() };
 
+    if (this.selectorAhead()) return { ...this.selectorBlock(), kind: 'styleRule' };
+
     if (this.cur().type === 'identifier' && ['println', 'errorln', 'warnln'].includes(this.cur().value)) {
       const kind = this.cur().value; this.pos++;
       this.consume('(');
@@ -472,9 +622,12 @@ class Parser {
     const expr = this.expression();
     const t = this.cur();
     if (t.type === 'operator' && (t.value === '=' || COMPOUND_OPS.includes(t.value))) {
-      if (!ASSIGNABLE.includes(expr.kind)) throw new CITError('The left side of an assignment must be a variable, property, list item or dictionary item.', t.line, t.column);
+      const target = expr.kind === 'list' && expr.items.every(item => item === null || item.kind === 'variable')
+        ? { ...expr, kind: 'pattern' }
+        : expr;
+      if (!ASSIGNABLE.includes(target.kind)) throw new CITError('The left side of an assignment must be a variable, property, list item or dictionary item.', t.line, t.column);
       this.pos++;
-      return { kind: 'assign', target: expr, op: t.value, expr: this.expression(), token: t };
+      return { kind: 'assign', target, op: t.value, expr: this.expression(), token: t };
     }
     return { kind: 'expr', expr };
   }
@@ -497,7 +650,7 @@ class Parser {
       if (!ASSIGNABLE.includes(target.kind)) throw new CITError(`'${t0.value}' needs a variable, property or list item.`, t0.line, t0.column);
       left = { kind: 'update', op: t0.value, prefix: true, target, token: t0 };
     } else if (this.match('!', '-', '+')) {
-      left = { kind: 'unary', op: t0.value, expr: this.binary(8) };
+      left = { kind: 'unary', op: t0.value, expr: this.binary(11) };
     } else left = this.postfix();
     for (;;) {
       const t = this.cur();
@@ -512,7 +665,14 @@ class Parser {
       if (p === undefined || p < min) break;
       this.pos++;
       const right = this.binary(p + (t.value === '**' ? 0 : 1));
-      left = { kind: 'binary', op: t.value, left, right, token: t };
+      const equality = node => node.kind === 'binary' && ['==', '!='].includes(node.op);
+      if (t.value === '||' && equality(left) && !equality(right)) {
+        left = left.kind === 'oneOf'
+          ? { ...left, candidates: [...left.candidates, right] }
+          : { kind: 'oneOf', op: left.op, subject: left.left, candidates: [left.right, right], token: t };
+      } else if (t.value === '||' && left.kind === 'oneOf' && !equality(right)) {
+        left = { ...left, candidates: [...left.candidates, right] };
+      } else left = { kind: 'binary', op: t.value, left, right, token: t };
     }
     return left;
   }
@@ -527,11 +687,20 @@ class Parser {
         e = { kind: 'member', object: e, name: name.value, optional, token: name };
         continue;
       }
-      if (this.check('[')) {
+      if (this.check('[') && this.cur().line === this.tokens[this.pos - 1].line) {
         const tok = this.cur(); this.pos++;
-        const index = this.withArgs(() => this.expression());
-        this.consume(']', "Expected ']' after the index.");
-        e = { kind: 'index', object: e, index, token: tok };
+        let start = null, end = null, step = null;
+        if (!this.check(':') && !this.check(']')) start = this.withArgs(() => this.expression());
+        if (this.match(':')) {
+          if (!this.check(':') && !this.check(']')) end = this.withArgs(() => this.expression());
+          if (this.match(':') && !this.check(']')) step = this.withArgs(() => this.expression());
+          this.consume(']', "Expected ']' after the slice.");
+          e = { kind: 'slice', object: e, start, end, step, token: tok };
+        } else {
+          if (!start) throw new CITError('An index cannot be empty.', tok.line, tok.column);
+          this.consume(']', "Expected ']' after the index.");
+          e = { kind: 'index', object: e, index: start, token: tok };
+        }
         continue;
       }
       if (this.match('(')) {
@@ -541,11 +710,18 @@ class Parser {
             let name = null;
             const nx = this.peek();
             if (this.cur().type === 'identifier' && nx && ((nx.type === 'punctuation' && nx.value === ':') || (nx.type === 'operator' && nx.value === '='))) { name = this.cur().value; this.pos += 2; }
-            args.push({ name, value: this.expression() });
+            if (this.cur().type === 'identifier' && ['admin', 'required', 'disabled', 'multiple', 'checked', 'readonly', 'autofocus'].includes(this.cur().value)
+              && this.peek()?.type === 'punctuation' && [',', ')'].includes(this.peek().value)) {
+              args.push({ name: this.cur().value, value: { kind: 'literal', value: true } });
+              this.pos++;
+            } else args.push({ name, value: this.expression() });
           } while (this.match(','));
         });
         this.consume(')');
         e = { kind: 'call', callee: e, args };
+        if (e.callee.kind === 'member' && e.callee.object.kind === 'variable' && e.callee.object.name === 'ui' && this.check('{')) {
+          e.childrenBody = this.block();
+        }
         continue;
       }
       break;
@@ -618,9 +794,17 @@ class Parser {
       return { kind: 'lambda', name, params, body: this.block(), token: t };
     }
 
+    if (this.match('if')) {
+      const condition = this.condition();
+      const yes = this.block();
+      this.consume('else', "Expected 'else' after the conditional expression.");
+      return { kind: 'conditionalBlock', condition, yes, no: this.block(), token: t };
+    }
+
     if (this.match('true')) return { kind: 'literal', value: true };
     if (this.match('false')) return { kind: 'literal', value: false };
     if (this.match('null')) return { kind: 'literal', value: null };
+    if (this.selectorAhead()) return this.selectorBlock();
     if (['int', 'float', 'string', 'char', 'template'].includes(t.type)) {
       this.pos++;
       return { kind: 'literal', value: t.value, litType: t.type, token: t };
@@ -631,9 +815,13 @@ class Parser {
     if (this.check('[')) {                                        // list
       this.pos++;
       const items = [];
-      this.withArgs(() => { if (!this.check(']')) do { if (this.check(']')) break; items.push(this.expression()); } while (this.match(',')); });
+      this.withArgs(() => { if (!this.check(']')) do {
+        if (this.check(']')) break;
+        if (this.check(',')) { items.push(null); continue; }
+        items.push(this.expression());
+      } while (this.match(',')); });
       this.consume(']', "Expected ']' to close the list.");
-      return { kind: 'list', items, token: t };
+      return { kind: items.some(item => item === null) ? 'pattern' : 'list', items, token: t };
     }
 
     if (this.check('{')) {                                        // dictionary or set
@@ -675,7 +863,16 @@ class Parser {
       this.consume(')', "Expected ')' to close the tuple.");
       return { kind: 'tuple', items, token: t };
     }
-    if (t.type === 'identifier') { this.pos++; return { kind: 'variable', name: t.value, token: t }; }
+    if (this.match('$')) {
+      const name = this.ident('Expected a color or style variable name after $.');
+      return { kind: 'variable', name: `$${name.value}`, token: t };
+    }
+    if (t.type === 'identifier') {
+      this.pos++;
+      const value = { kind: 'variable', name: t.value, token: t };
+      if (this.match(':')) return { kind: 'tree', root: value, child: this.expression(), token: t };
+      return value;
+    }
     throw new CITError(`Expected expression, found '${t.value || 'end of file'}'.`, t.line, t.column);
   }
 }
@@ -706,8 +903,40 @@ function checked(v, t, tok = { line: 1, column: 1 }) {
   throw new CITError(`Type mismatch: expected ${t}, received ${actual}.`, tok.line, tok.column);
 }
 
+function castWidth(value, width, tok = { line: 1, column: 1 }) {
+  const fail = msg => { throw new CITError(msg, tok.line, tok.column); };
+  const bits = Number(width.slice(1));
+  if (width[0] === 'i') {
+    if (!Number.isSafeInteger(value)) fail(`${width} requires a safe integer.`);
+    const min = bits === 64 ? Number.MIN_SAFE_INTEGER : -(2 ** (bits - 1));
+    const max = bits === 64 ? Number.MAX_SAFE_INTEGER : 2 ** (bits - 1) - 1;
+    if (value < min || value > max) fail(`${value} is outside the ${width} range (${min} to ${max}).`);
+    return value;
+  }
+  if (width[0] === 'f') {
+    if (typeof value !== 'number') fail(`${width} requires a number.`);
+    if (width === 'f32') return Math.fround(value);
+    if (width === 'f64') return value;
+    if (!Number.isFinite(value)) return value;
+    const precision = width === 'f16' ? 11 : 4;
+    const exponent = Math.floor(Math.log2(Math.abs(value)));
+    if (exponent < -14 && width === 'f16') return 0;
+    if (exponent < -6 && width === 'f8') return 0;
+    const quantum = 2 ** (exponent - precision + 1);
+    return Math.round(value / quantum) * quantum;
+  }
+  if (width[0] === 's') {
+    if (typeof value !== 'string') fail(`${width} requires a string.`);
+    const maxBytes = bits;
+    if (Buffer.byteLength(value, 'utf8') > maxBytes) fail(`Text exceeds the ${width} storage limit of ${maxBytes} UTF-8 bytes.`);
+    return value;
+  }
+  if (width[0] === 'b' && typeof value !== 'boolean') fail(`${width} requires a boolean.`);
+  return value;
+}
+
 const truthy = v => v !== false && v !== null && v !== undefined && v !== 0 && v !== ''
-  && !(Array.isArray(v) && v.length === 0) && !(v instanceof Map && v.size === 0);
+  && !(Array.isArray(v) && v.length === 0) && !(v instanceof Map && v.size === 0) && !(v instanceof Set && v.size === 0);
 
 function formatKey(k) {
   return typeof k === 'string' ? (/^[A-Za-z_][A-Za-z0-9_]*$/.test(k) ? k : JSON.stringify(k)) : String(k);
@@ -736,6 +965,7 @@ function valuesEqual(a, b) {
     return Boolean(a[TUPLE]) === Boolean(b[TUPLE]) && a.length === b.length && a.every((x, i) => valuesEqual(x, b[i]));
   }
   if (a instanceof Map && b instanceof Map) return a.size === b.size && [...a].every(([k, x]) => b.has(k) && valuesEqual(x, b.get(k)));
+  if (a instanceof Set && b instanceof Set) return a.size === b.size && [...a].every(x => [...b].some(y => valuesEqual(x, y)));
   return a === b;
 }
 
@@ -745,7 +975,13 @@ function dictKey(k, tok = { line: 1, column: 1 }) {
 }
 
 class Env {
-  constructor(parent = null) { this.parent = parent; this.values = new Map(); }
+  constructor(parent = null) {
+    this.parent = parent;
+    this.values = new Map();
+    this.className = parent?.className || null;
+    this.accessorName = parent?.accessorName || null;
+    this.functionId = parent?.functionId || null;
+  }
   find(n) { if (this.values.has(n)) return this; return this.parent ? this.parent.find(n) : null; }
   binding(n) { const e = this.find(n); return e ? e.values.get(n) : null; }
   get(n, tok) {
@@ -763,16 +999,33 @@ class Env {
       if (!allowed) throw new CITError(`Cannot access ${binding.fieldAccess.visibility} field '${n}' outside its class.`, tok?.line || 1, tok?.column || 1);
     }
     if (binding.temporal) {
-      const expired = binding.temporal.unit === 's'
-        ? Date.now() >= binding.temporal.expiresAt
-        : (tok?.line || 1) > binding.temporal.expiresLine;
-      if (expired) throw new CITError(`Temporal variable '${n}' has expired.`, tok?.line || 1, tok?.column || 1);
+      const temporal = binding.temporal;
+      const now = Date.now();
+      let expired = temporal.unit === 's'
+        ? temporal.mode === 'offline'
+          ? now - temporal.lastUsedAt >= temporal.amount * 1000
+          : temporal.mode === 'stopUse' ? false : now >= temporal.expiresAt
+        : temporal.unit === 'l'
+          ? (tok?.line || 1) > temporal.expiresLine
+          : temporal.remainingReads <= 0;
+      if (temporal.mode === 'stopUse' && typeof temporal.isIdle === 'function') {
+        if (temporal.isIdle()) {
+          temporal.idleSince ??= now;
+          expired ||= now - temporal.idleSince >= temporal.amount * 1000;
+        } else temporal.idleSince = null;
+      }
+      if (expired) {
+        e.values.delete(n);
+        throw new CITError(`Temporal variable '${n}' has expired.`, tok?.line || 1, tok?.column || 1);
+      }
+      if (temporal.unit === 'r') temporal.remainingReads--;
+      if (temporal.mode === 'offline') temporal.lastUsedAt = now;
     }
     return binding.value;
   }
-  define(n, v, mutable = true, type = typeOf(v), tok = { line: 1, column: 1 }, temporal = null) {
+  define(n, v, mutable = true, type = typeOf(v), tok = { line: 1, column: 1 }, temporal = null, width = null) {
     if (this.values.has(n)) throw new CITError(`'${n}' is already declared.`, tok.line, tok.column);
-    const b = { value: v, mutable, type, temporal };
+    const b = { value: v, mutable, type, temporal, width };
     this.values.set(n, b);
     return b;
   }
@@ -791,6 +1044,7 @@ class Env {
     } else {
       checked(v, x.type, tok);
     }
+    if (x.width) v = castWidth(v, x.width, tok);
     x.value = v;
   }
 }
@@ -891,6 +1145,26 @@ const LIST_METHODS = {
     const items = l.slice();
     for (let i = 0; i < items.length; i++) if (truthy(await c.call(f, items[i], i))) return items[i];
     return null;
+  } },
+  flat:    { min: 0, max: 1, run: (l, [depth = 1], c) => {
+    if (!Number.isInteger(depth) || depth < 0) throw c.err('flat() depth must be a non-negative integer.');
+    const flatten = (items, remaining) => items.flatMap(item => Array.isArray(item) && remaining > 0 ? flatten(item, remaining - 1) : [item]);
+    return flatten(l, depth);
+  } },
+  shuffle: { min: 0, max: 0, run: (l, a, c) => {
+    const out = l.slice();
+    for (let i = out.length - 1; i > 0; i--) {
+      const j = Math.floor(c.random() * (i + 1));
+      [out[i], out[j]] = [out[j], out[i]];
+    }
+    return out;
+  } },
+  chunk:   { min: 1, max: 1, run: (l, [size], c) => {
+    needInt(size, 'chunk() size', c);
+    if (size <= 0) throw c.err('chunk() size must be greater than 0.');
+    const chunks = [];
+    for (let i = 0; i < l.length; i += size) chunks.push(l.slice(i, i + size));
+    return chunks;
   } }
 };
 
@@ -995,7 +1269,64 @@ const STRING_METHODS = {
     const start = [...s].slice(0, Math.max(0, from)).join('').length;
     const k = s.indexOf(x, start);
     return k < 0 ? -1 : [...s.slice(0, k)].length;
+  } },
+  isNumeric: { min: 0, max: 0, run: s => s.trim() !== '' && Number.isFinite(Number(s)) },
+  capitalize: { min: 0, max: 0, run: s => {
+    const chars = [...s];
+    return chars.length ? chars[0].toLocaleUpperCase() + chars.slice(1).join('') : '';
   } }
+};
+
+const TUPLE_METHODS = {
+  ...Object.fromEntries(Object.entries(LIST_METHODS).filter(([, method]) => !method.mutates))
+};
+
+const SET_METHODS = {
+  add: { mutates: true, min: 1, max: 1, run: (set, [value]) => { set.add(value); return null; } },
+  update: { mutates: true, min: 1, max: Infinity, run: (set, values, c) => {
+    for (const value of values) {
+      if (value instanceof Set || Array.isArray(value) || typeof value === 'string') for (const item of value) set.add(item);
+      else throw c.err('set.update() values must be sets, lists or strings.');
+    }
+    return null;
+  } },
+  intersectionUpdate: { mutates: true, min: 1, max: 1, run: (set, [other], c) => {
+    if (!(other instanceof Set)) throw c.err('intersectionUpdate() needs a set.');
+    for (const value of set) if (!other.has(value)) set.delete(value);
+    return null;
+  } },
+  differenceUpdate: { mutates: true, min: 1, max: 1, run: (set, [other], c) => {
+    if (!(other instanceof Set)) throw c.err('differenceUpdate() needs a set.');
+    for (const value of other) set.delete(value);
+    return null;
+  } },
+  symmetricDifferenceUpdate: { mutates: true, min: 1, max: 1, run: (set, [other], c) => {
+    if (!(other instanceof Set)) throw c.err('symmetricDifferenceUpdate() needs a set.');
+    for (const value of other) { if (set.has(value)) set.delete(value); else set.add(value); }
+    return null;
+  } },
+  isSubSet: { min: 1, max: 1, run: (set, [other], c) => {
+    if (!(other instanceof Set)) throw c.err('isSubSet() needs a set.');
+    return [...set].every(value => other.has(value));
+  } },
+  isSuperSet: { min: 1, max: 1, run: (set, [other], c) => {
+    if (!(other instanceof Set)) throw c.err('isSuperSet() needs a set.');
+    return [...other].every(value => set.has(value));
+  } },
+  remove: { mutates: true, min: 1, max: 1, run: (set, [value], c) => {
+    if (!set.delete(value)) throw c.err(`remove(): ${format(value, true)} is not in the set.`);
+    return null;
+  } },
+  discard: { mutates: true, min: 1, max: 1, run: (set, [value]) => { set.delete(value); return null; } },
+  pop: { mutates: true, min: 0, max: 0, run: (set, values, c) => {
+    if (!set.size) throw c.err('Cannot pop from an empty set.');
+    const value = set.values().next().value;
+    set.delete(value);
+    return value;
+  } },
+  clear: { mutates: true, min: 0, max: 0, run: set => { set.clear(); return null; } },
+  copy: { min: 0, max: 0, run: set => new Set(set) },
+  count: { min: 1, max: 1, run: (set, [value]) => set.has(value) ? 1 : 0 }
 };
 
 // toFixed(2) rounds to 2 digits after the point and gives back a number: 8.2222 -> 8.22
@@ -1007,7 +1338,7 @@ const NUMBER_METHODS = {
   } }
 };
 
-const BUILTINS = new Set(['input', 'castInt', 'castFloat', 'castString', 'castBool', 'range', 'min', 'max', 'sum', 'len', 'random', 'randint', 'list', 'tuple', 'set', 'dict', 'frozendict', 'frozenset', 'object', 'bin', 'zip', 'enumerate', 'enumarate', 'round', 'id', 'type', 'isinstance', 'issubclass', 'square', 'printf', 'exchange', 'sleep', 'open']);
+const BUILTINS = new Set(['input', 'castInt', 'castFloat', 'castString', 'castBool', 'range', 'min', 'max', 'sum', 'len', 'random', 'randint', 'list', 'tuple', 'set', 'dict', 'frozendict', 'frozenset', 'object', 'bin', 'zip', 'enumerate', 'enumarate', 'round', 'id', 'type', 'isinstance', 'issubclass', 'square', 'printf', 'exchange', 'sleep', 'open', 'union', 'intersection', 'difference', 'symmetricDifference', 'longString', 'longNumber', 'hex', 'hsl', 'hsv', 'rgb', 'rgba', 'clr']);
 
 /* ------------------------------------------------------------------ */
 /* Interpreter                                                         */
@@ -1034,11 +1365,34 @@ async function run(source, output = () => {}, input = async prompt => '', option
   const moduleCache = new Map(), loading = new Set();
   const SHORT = Symbol('short-circuit');      // result of a ?. chain that hit null
   const startedAt = Date.now();
+  const styleDefinitions = new Map();
+  let activeStyleName = null;
+  let collectingStyles = null;
+  const styleModule = {
+    __module: 'ui-style',
+    connect(name) {
+      if (typeof name !== 'string' || !styleDefinitions.has(name)) throw new CITError(`No style named '${name}' is defined.`);
+      activeStyleName = name;
+      return null;
+    }
+  };
+  global.define('window', {
+    prompt: async message => {
+      if (typeof options.windowPrompt === 'function') return options.windowPrompt(String(message ?? ''));
+      return input(String(message ?? ''));
+    },
+    alert: async message => {
+      if (typeof options.windowAlert === 'function') await options.windowAlert(String(message ?? ''));
+      else emit('println', message ?? '');
+      return null;
+    }
+  }, false, 'module');
   global.define('task', { wait: seconds => {
     if (typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds < 0) throw new CITError('task.wait() needs a non-negative number of seconds.');
     return new Promise(resolve => setTimeout(resolve, seconds * 1000));
   } }, false, 'module');
   let nextObjectId = 1;
+  let nextFunctionId = 1;
   const objectIds = new WeakMap(), primitiveIds = new Map();
 
   /* ---- expressions ---- */
@@ -1050,7 +1404,9 @@ async function run(source, output = () => {}, input = async prompt => '', option
       case 'literal': return e.litType === 'template' ? interpolate(e.value, env) : e.value;
       case 'variable': return env.get(e.name, e.token);
       case 'conditional': return truthy(await ev(e.condition, env)) ? ev(e.test, env) : ev(e.otherwise, env);
+      case 'conditionalBlock': return evalBlockValue(truthy(await ev(e.condition, env)) ? e.yes : e.no, env);
       case 'list': { const out = []; for (const item of e.items) out.push(await ev(item, env)); return out; }
+      case 'tree': return [await ev(e.root, env), [await ev(e.child, env)]];
       case 'tuple': {
         const out = [];
         for (const item of e.items) out.push(await ev(item, env));
@@ -1064,6 +1420,8 @@ async function run(source, output = () => {}, input = async prompt => '', option
         for (const en of e.entries) d.set(dictKey(await ev(en.key, env), en.key.token), await ev(en.value, env));
         return d;
       }
+      case 'styleSelector': return evaluateStyleSelector(e, env);
+      case 'pattern': return e;
       case 'lambda': {
         const fn = { kind: 'function', name: e.name, params: e.params, body: e.body, closure: env };
         if (e.name) { const own = new Env(env); own.define(e.name, fn, false, 'function'); fn.closure = own; }   // lets it call itself
@@ -1073,6 +1431,24 @@ async function run(source, output = () => {}, input = async prompt => '', option
         const o = await evx(e.object, env);
         if (o === SHORT) return SHORT;
         return readIndex(o, await indexValue(e.index, env, o), e.token);
+      }
+      case 'slice': {
+        const o = await ev(e.object, env);
+        if (!Array.isArray(o) && typeof o !== 'string') throw new CITError(`Only lists and strings can be sliced, not ${typeOf(o)}.`, e.token.line, e.token.column);
+        const start = e.start ? await ev(e.start, env) : undefined;
+        const end = e.end ? await ev(e.end, env) : undefined;
+        const step = e.step ? await ev(e.step, env) : 1;
+        if (!Number.isInteger(step) || step === 0) throw new CITError('A slice step must be a non-zero integer.', e.token.line, e.token.column);
+        const items = typeof o === 'string' ? [...o] : o;
+        const [from, to] = sliceBounds(items.length, start, end, { err: msg => new CITError(msg, e.token.line, e.token.column) }, 'slice');
+        const selected = [];
+        if (step > 0) for (let i = from; i < to; i += step) selected.push(items[i]);
+        else {
+          let i = start === undefined ? items.length - 1 : (start < 0 ? items.length + start : start);
+          const stop = end === undefined ? -1 : (end < 0 ? items.length + end : end);
+          for (; i > stop; i += step) if (i >= 0 && i < items.length) selected.push(items[i]);
+        }
+        return typeof o === 'string' ? selected.join('') : selected;
       }
       case 'member': {
         const o = await evx(e.object, env);
@@ -1094,9 +1470,56 @@ async function run(source, output = () => {}, input = async prompt => '', option
         if (e.op === '||') return truthy(a) || truthy(await ev(e.right, env));
         return binaryOp(e.op, a, await ev(e.right, env), e.token);
       }
+      case 'oneOf': {
+        const subject = await ev(e.subject, env);
+        for (const candidate of e.candidates) {
+          const equal = valuesEqual(subject, await ev(candidate, env));
+          if (e.op === '==' ? equal : !equal) {
+            if (e.op === '==') return true;
+          } else if (e.op === '!=') return false;
+        }
+        return e.op === '!=';
+      }
       case 'call': return call(e, env);
       default: throw new CITError('Invalid expression.');
     }
+  }
+
+  async function evalBlockValue(body, parent) {
+    const env = new Env(parent);
+    let value = null;
+    for (const statement of body) {
+      if (statement.kind === 'expr') value = await ev(statement.expr, env);
+      else {
+        const result = await exec([statement], env);
+        if (result?.type === RETURN) return result.value;
+        if (result) return null;
+      }
+    }
+    return value;
+  }
+
+  async function evaluateStyleSelector(node, env) {
+    if (!collectingStyles) throw new CITError('Style selectors can only be used while rendering a connected style.');
+    const properties = {};
+    for (const statement of node.body) {
+      if (statement.kind !== 'assign' || statement.target.kind !== 'variable' || statement.op !== '=') {
+        throw new CITError('Style blocks only support property assignments.', node.token.line, node.token.column);
+      }
+      properties[statement.target.name.replace(/^\$/, '')] = await ev(statement.expr, env);
+    }
+    const rule = { selector: node.selector, properties };
+    collectingStyles.push(rule);
+    return rule;
+  }
+
+  async function evalUIChildren(body, env) {
+    const children = [];
+    for (const statement of body) {
+      if (statement.kind === 'expr') children.push(await ev(statement.expr, env));
+      else await exec([statement], env);
+    }
+    return children.flat().filter(value => value !== null && value !== undefined);
   }
 
   // value in text / list / dictionary
@@ -1131,6 +1554,17 @@ async function run(source, output = () => {}, input = async prompt => '', option
     const fail = msg => new CITError(msg, tok.line, tok.column);
     if (op === '==') return valuesEqual(a, b);
     if (op === '!=') return !valuesEqual(a, b);
+    if (['|', '&', '^', '-'].includes(op) && a instanceof Set && b instanceof Set) {
+      if (op === '|') return new Set([...a, ...b]);
+      if (op === '&') return new Set([...a].filter(value => b.has(value)));
+      if (op === '^') return new Set([...a].filter(value => !b.has(value)).concat([...b].filter(value => !a.has(value))));
+      return new Set([...a].filter(value => !b.has(value)));
+    }
+    if (['<=', '<', '>=', '>'].includes(op) && a instanceof Set && b instanceof Set) {
+      const subset = [...a].every(value => b.has(value));
+      const superset = [...b].every(value => a.has(value));
+      return op === '<=' ? subset : op === '<' ? subset && a.size < b.size : op === '>=' ? superset : superset && a.size > b.size;
+    }
     if (op === '+') {
       if (Array.isArray(a) && Array.isArray(b)) return [...a, ...b];
       if (typeof a === 'string' && typeof b === 'string') return a + b;
@@ -1187,7 +1621,7 @@ async function run(source, output = () => {}, input = async prompt => '', option
       : className !== null && chain.includes(className) && chain.includes(access.owner);
   }
 
-  function readMember(o, e, env) {
+  async function readMember(o, e, env) {
     const tok = e.token || { line: 1, column: 1 };
     if (o === null || o === undefined) throw new CITError(`Cannot read '${e.name}' from null. Use ?. to skip null values (value?.${e.name}).`, tok.line, tok.column);
     if (Array.isArray(o)) {
@@ -1202,8 +1636,9 @@ async function run(source, output = () => {}, input = async prompt => '', option
     if (typeof o === 'string' && hasOwn(STRING_METHODS, e.name)) throw new CITError(`'${e.name}' is a string method. Call it like s.${e.name}(...).`, tok.line, tok.column);
     if (typeof o !== 'object') throw new CITError(`Cannot read '${e.name}' from a ${typeOf(o)}.`, tok.line, tok.column);
     const access = FIELD_ACCESS.get(o)?.get(e.name);
-    if (access && !canAccessField(o, access, env)) throw new CITError(`Cannot access ${access.visibility} field '${e.name}' outside its class.`, tok.line, tok.column);
+    if (access && !o.__getters?.[e.name] && !canAccessField(o, access, env)) throw new CITError(`Cannot access ${access.visibility} field '${e.name}' outside its class.`, tok.line, tok.column);
     if (o.__module && !hasOwn(o, e.name)) throw new CITError(`Module '${o.__module}' has no export '${e.name}'.`, tok.line, tok.column);
+    if (o.__getters?.[e.name] && env.accessorName !== e.name) return await o.__getters[e.name]();
     return hasOwn(o, e.name) ? o[e.name] : null;
   }
 
@@ -1213,6 +1648,7 @@ async function run(source, output = () => {}, input = async prompt => '', option
     const b = env.binding(objExpr.name);
     if (b && READONLY.has(b.value)) throw new CITError(`Cannot ${action} '${objExpr.name}' because it is read-only.`, tok.line, tok.column);
     if (b && b.value && b.value[TUPLE]) throw new CITError(`Cannot ${action} '${objExpr.name}' because tuples are immutable.`, tok.line, tok.column);
+    if (b && b.value instanceof Set && READONLY.has(b.value)) throw new CITError(`Cannot ${action} '${objExpr.name}' because it is read-only.`, tok.line, tok.column);
     if (b && !b.mutable && !b.param) {
       throw new CITError(`Cannot ${action} '${objExpr.name}' because it was declared with 'let'. Use 'let mut ${objExpr.name}'.`, tok.line, tok.column);
     }
@@ -1225,8 +1661,14 @@ async function run(source, output = () => {}, input = async prompt => '', option
       if (s[i] === '{') {
         const end = s.indexOf('}', i + 1);
         if (end >= 0) {
-          const value = await ev(new Parser(tokenize(s.slice(i + 1, end))).expression(), env);
-          result += format(value);
+          const interpolation = s.slice(i + 1, end);
+          const formatMatch = interpolation.match(/^(.*):\.(\d+)f$/s);
+          const expression = formatMatch ? formatMatch[1] : interpolation;
+          const value = await ev(new Parser(tokenize(expression)).expression(), env);
+          if (formatMatch) {
+            if (typeof value !== 'number') throw new CITError('A floating-point template format needs a number.');
+            result += value.toFixed(Number(formatMatch[2]));
+          } else result += format(value);
           i = end + 1;
           continue;
         }
@@ -1246,8 +1688,55 @@ async function run(source, output = () => {}, input = async prompt => '', option
       if (obj === SHORT) return SHORT;
       const tok = callee.token || { line: 1, column: 1 };
       if (callee.optional && (obj === null || obj === undefined)) return SHORT;     // p?.talk()
+      if (obj?.__module === 'ui') {
+        const attrs = {}, children = [];
+        for (const arg of e.args) {
+          const value = await ev(arg.value, env);
+          if (arg.name) attrs[arg.name] = value;
+          else children.push(value);
+        }
+        if (e.childrenBody) children.push(...await evalUIChildren(e.childrenBody, env));
+        if (!['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'title', 'header', 'p', 'button', 'slider', 'div', 'select', 'option', 'tile', 'input'].includes(callee.name)) {
+          throw new CITError(`ui has no element '${callee.name}'.`, tok.line, tok.column);
+        }
+        return { __ui: true, tag: callee.name, attrs, children };
+      }
+      if (obj?.__module === 'json' && ['dumps', 'dump'].includes(callee.name)) {
+        const values = [];
+        const named = {};
+        for (const arg of e.args) {
+          const value = await ev(arg.value, env);
+          if (arg.name) named[arg.name] = value;
+          else values.push(value);
+        }
+        const dump = callee.name === 'dump';
+        const wanted = dump ? 2 : 1;
+        if (values.length !== wanted) throw new CITError(`json.${callee.name}() needs ${wanted} positional value${wanted === 1 ? '' : 's'}.`, tok.line, tok.column);
+        const indent = named.indent === undefined ? 0 : named.indent;
+        if (!Number.isInteger(indent) || indent < 0 || indent > 10) throw new CITError('JSON indent must be an integer from 0 to 10.', tok.line, tok.column);
+        if (named.sortKeys !== undefined && typeof named.sortKeys !== 'boolean') throw new CITError('JSON sortKeys must be a boolean.', tok.line, tok.column);
+        let value;
+        try {
+          const jsonValue = toJsonValue(values[0]);
+          const ordered = named.sortKeys ? sortJsonKeys(jsonValue) : jsonValue;
+          value = JSON.stringify(ordered, null, indent);
+        } catch (cause) { throw new CITError(`json.${callee.name}(): ${cause.message}`, tok.line, tok.column); }
+        if (dump) {
+          if (!values[1] || typeof values[1].write !== 'function') throw new CITError('json.dump(value, file) needs a writable file.', tok.line, tok.column);
+          values[1].write(value);
+          return null;
+        }
+        return value;
+      }
       if (Array.isArray(obj) && callee.name === 'render' && obj.some(item => item && item.__ui)) {
-        if (typeof options.renderUI === 'function') return options.renderUI(obj, obj.__uiTitle || 'CIT App');
+        let styles = [];
+        if (activeStyleName) {
+          const styleFn = styleDefinitions.get(activeStyleName);
+          if (!styleFn) throw new CITError(`No style named '${activeStyleName}' is defined.`, tok.line, tok.column);
+          collectingStyles = [];
+          try { await invoke(styleFn, [], env); styles = collectingStyles; } finally { collectingStyles = null; }
+        }
+        if (typeof options.renderUI === 'function') return options.renderUI(obj, obj.__uiTitle || 'CIT App', styles);
         const renderText = value => {
           if (Array.isArray(value)) return value.map(renderText).filter(Boolean).join('\n');
           if (value && value.__ui) return value.children.map(renderText).filter(Boolean).join('\n');
@@ -1256,8 +1745,10 @@ async function run(source, output = () => {}, input = async prompt => '', option
         emit('println', [obj.__uiTitle, renderText(obj)].filter(Boolean).join('\n'));
         return null;
       }
+      if (Array.isArray(obj) && obj[TUPLE]) return invokeMethod(obj, 'tuple', 'Tuples', TUPLE_METHODS, e, env);
       if (Array.isArray(obj)) return invokeMethod(obj, 'list', 'Lists', LIST_METHODS, e, env);
       if (obj instanceof Map) return invokeMethod(obj, 'dictionary', 'Dictionaries', DICT_METHODS, e, env);
+      if (obj instanceof Set) return invokeMethod(obj, 'set', 'Sets', SET_METHODS, e, env);
       if (typeof obj === 'string') return invokeMethod(obj, 'string', 'Strings', STRING_METHODS, e, env);
       if (typeof obj === 'number') return invokeMethod(obj, 'number', 'Numbers', NUMBER_METHODS, e, env);
       if (obj === null || obj === undefined) {
@@ -1321,6 +1812,7 @@ async function run(source, output = () => {}, input = async prompt => '', option
     if (def.mutates) requireMutable(e.callee.object, env, `change ${typeName}`, tok);
     const ctx = {
       err, tok,
+      random: rand,
       call: (fn, ...args) => callValue(fn, args.map(value => ({ name: null, value })), env, 'callback', tok)
     };
     return await def.run(obj, vals, ctx);
@@ -1432,6 +1924,41 @@ async function run(source, output = () => {}, input = async prompt => '', option
         if (name === 'frozendict') READONLY.add(result);
         return result;
       }
+      case 'union': case 'intersection': case 'difference': case 'symmetricDifference': {
+        if (args.length !== 2 || !(args[0] instanceof Set) || !(args[1] instanceof Set)) throw err(`${name}() needs two sets.`);
+        const [left, right] = args;
+        if (name === 'union') return new Set([...left, ...right]);
+        if (name === 'intersection') return new Set([...left].filter(value => right.has(value)));
+        if (name === 'difference') return new Set([...left].filter(value => !right.has(value)));
+        return new Set([...left].filter(value => !right.has(value)).concat([...right].filter(value => !left.has(value))));
+      }
+      case 'longString': {
+        if (args.length !== 1) throw err('longString() takes one value.');
+        return format(args[0]);
+      }
+      case 'longNumber': {
+        if (args.length !== 1 || !(typeof args[0] === 'number' || typeof args[0] === 'string')) throw err('longNumber() takes one number or numeric string.');
+        const value = typeof args[0] === 'number' ? args[0] : Number(args[0].trim());
+        if (!Number.isFinite(value)) throw err('longNumber(): value must be a finite number.');
+        return value;
+      }
+      case 'hex': case 'clr': {
+        if (args.length !== 1 || typeof args[0] !== 'string') throw err(`${name}() needs one hexadecimal color string.`);
+        const value = args[0].replace(/^#/, '');
+        if (!/^(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(value)) throw err(`${name}() needs 3, 6 or 8 hexadecimal digits.`);
+        return `#${value}`;
+      }
+      case 'rgb': case 'rgba': {
+        const expected = name === 'rgb' ? 3 : 4;
+        if (args.length !== expected || !args.every(value => typeof value === 'number' && Number.isFinite(value))) throw err(`${name}() needs ${expected} numeric values.`);
+        const channels = args.slice(0, 3);
+        if (channels.some(value => value < 0 || value > 255) || (name === 'rgba' && (args[3] < 0 || args[3] > 1))) throw err(`${name}() values are outside the ${name} range.`);
+        return `${name}(${args.join(', ')})`;
+      }
+      case 'hsl': case 'hsv': {
+        if (args.length !== 3 || !args.every(value => typeof value === 'number' && Number.isFinite(value))) throw err(`${name}() needs three numeric values.`);
+        return `${name}(${args.join(', ')})`;
+      }
       case 'object': return {};
       case 'type': {
         if (args.length !== 1) throw err('type() takes one value.');
@@ -1539,6 +2066,8 @@ async function run(source, output = () => {}, input = async prompt => '', option
   async function invoke(fn, args, parent) {
     const local = new Env(fn.closure || parent);
     local.defers = [];
+    local.functionId = fn.staticId || fn.name || 'anonymous';
+    local.accessorName = fn.accessor ? fn.name : null;
     let pos = 0;
     for (const p of fn.params) {
       const named = args.find(a => a.name === p.name);
@@ -1582,8 +2111,9 @@ async function run(source, output = () => {}, input = async prompt => '', option
     instanceEnv.define('self', instance, false);
 
     const tables = [];
+    const getterFns = {}, setterFns = {};
     let structFn = null, structEnv = null;
-    chain.forEach((c, i) => {
+    for (const [i, c] of chain.entries()) {
       const levelEnv = new Env(instanceEnv);
       levelEnv.className = c.name;
       levelEnv.define('super', async () => {
@@ -1596,11 +2126,27 @@ async function run(source, output = () => {}, input = async prompt => '', option
         if (n === 'struct') { structFn = m; structEnv = levelEnv; }
       }
       tables.push(table);
-    });
+      for (const [name, getter] of Object.entries(c.getters)) getterFns[name] = async () => invoke(getter, [], levelEnv);
+      for (const [name, setter] of Object.entries(c.setters)) setterFns[name] = async value => invoke(setter, [{ name: null, value }], levelEnv);
+      for (const [name, field] of Object.entries(c.fields)) {
+        const value = await ev(field.expr, levelEnv);
+        instance[name] = value;
+        const binding = instanceEnv.values.get(name);
+        if (binding) { binding.value = value; binding.mutable = field.mutable; }
+        else instanceEnv.define(name, value, field.mutable, typeOf(value), field.token);
+        if (field.visibility) {
+          let access = FIELD_ACCESS.get(instance);
+          if (!access) { access = new Map(); FIELD_ACCESS.set(instance, access); }
+          access.set(name, { visibility: field.visibility, owner: c.name });
+        }
+      }
+    }
     const merged = upto => Object.assign({}, ...tables.slice(0, upto + 1));
     const parentView = i => Object.assign(merged(i), { __class: chain[i].name });
 
     Object.assign(instance, merged(chain.length - 1));
+    Object.defineProperty(instance, '__getters', { value: getterFns });
+    Object.defineProperty(instance, '__setters', { value: setterFns });
     if (structFn) await invoke(structFn, args, structEnv);
     return instance;
   }
@@ -1609,6 +2155,7 @@ async function run(source, output = () => {}, input = async prompt => '', option
 
   function defaultAlias(spec) {
     let a = String(spec).split(/[\\/]/).filter(Boolean).pop() || 'module';
+    if (a === 'ui-style') return 'style';
     a = a.replace(/\.(cit|ct)$/, '').replace(/[^A-Za-z0-9_]/g, '_');
     return /^[0-9]/.test(a) ? '_' + a : a;
   }
@@ -1646,10 +2193,61 @@ async function run(source, output = () => {}, input = async prompt => '', option
       };
     }
     if (spec === 'ui') {
-      const tags = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'title', 'header', 'p'];
+      const tags = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'title', 'header', 'p', 'button', 'slider', 'div', 'select', 'option', 'tile', 'input'];
       const ui = { __module: 'ui' };
       for (const tag of tags) ui[tag] = (...children) => ({ __ui: true, tag, children });
       return ui;
+    }
+    if (spec === 'ui-style') return styleModule;
+    if (spec === 'json') return {
+      __module: 'json',
+      dumps: value => JSON.stringify(toJsonValue(value)),
+      dump: (value, file) => {
+        if (!file || typeof file.write !== 'function') throw new CITError('json.dump(value, file) needs a writable file.');
+        file.write(JSON.stringify(toJsonValue(value)));
+        return null;
+      },
+      loads: text => {
+        if (typeof text !== 'string') throw new CITError('json.loads() needs a string.');
+        try {         return fromJsonValue(JSON.parse(text)); } catch (cause) { throw new CITError(`json.loads(): ${cause.message}`, tok.line, tok.column); }
+      },
+      load: file => {
+        if (!file || typeof file.read !== 'function') throw new CITError('json.load(file) needs a readable file.');
+        try { return fromJsonValue(JSON.parse(file.read())); } catch (cause) { throw new CITError(`json.load(): ${cause.message}`, tok.line, tok.column); }
+      }
+    };
+    if (spec === 'time') {
+      const checkArgs = (name, args, min, max) => {
+        if (args.length < min || args.length > max) throw new CITError(`time.${name}() takes ${min === max ? min : `${min} to ${max}`} value${max === 1 ? '' : 's'} but got ${args.length}.`, tok.line, tok.column);
+      };
+      const timeObject = (date, utc) => {
+        const get = method => date[`${utc ? 'getUTC' : 'get'}${method}`]();
+        const jan1 = new Date(Date.UTC(get('FullYear'), 0, 1));
+        const epoch = Date.UTC(get('FullYear'), get('Month'), get('Date'));
+        return { year: get('FullYear'), month: get('Month') + 1, day: get('Date'), hour: get('Hours'), minute: get('Minutes'), second: get('Seconds'),
+          weekday: get('Day'), yearday: Math.floor((epoch - jan1.getTime()) / 86400000) + 1, isdst: false };
+      };
+      const formatTime = (format, date, utc = false) => {
+        const data = timeObject(date, utc);
+        const pad = (value, size = 2) => String(value).padStart(size, '0');
+        const names = { a: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], A: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'], b: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], B: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'] };
+        const codes = { Y: String(data.year), y: pad(data.year % 100), m: pad(data.month), d: pad(data.day), H: pad(data.hour), M: pad(data.minute), S: pad(data.second), w: String(data.weekday), j: pad(data.yearday, 3), a: names.a[data.weekday], A: names.A[data.weekday], b: names.b[data.month - 1], B: names.B[data.month - 1], '%': '%' };
+        return format.replace(/%([YymdHMSwjaAbB%])/g, (_, code) => codes[code]);
+      };
+      return {
+        __module: 'time',
+        time: () => Date.now() / 1000,
+        ctime: value => new Date(value === undefined ? Date.now() : value * 1000).toString(),
+        perfCounter: () => Number(process.hrtime.bigint()) / 1e9,
+        localtime: value => timeObject(new Date(value === undefined ? Date.now() : value * 1000), false),
+        gmtime: value => timeObject(new Date(value === undefined ? Date.now() : value * 1000), true),
+        asctime: value => {
+          const date = value ? timeFromStruct(value) : new Date();
+          return formatTime('%a %b %d %H:%M:%S %Y', date);
+        },
+        strftime: (format, value) => formatTime(format, value === undefined ? new Date() : timeFromStruct(value)),
+        strptime: (text, format) => parseTime(text, format, tok)
+      };
     }
     if (typeof options.resolveModule !== 'function') throw new CITError('Imports are not available in this environment.', tok.line, tok.column);
     let r;
@@ -1695,15 +2293,18 @@ async function run(source, output = () => {}, input = async prompt => '', option
         throw new CITError(`Cannot set '${t.name}' on a ${typeOf(o)}.`, t.token.line, t.token.column);
       }
       const currentAccess = FIELD_ACCESS.get(o)?.get(t.name);
-      if (currentAccess && !canAccessField(o, currentAccess, env)) {
+      if (currentAccess && !o.__setters?.[t.name] && !canAccessField(o, currentAccess, env)) {
         throw new CITError(`Cannot access ${currentAccess.visibility} field '${t.name}' outside its class.`, t.token.line, t.token.column);
       }
+      const setter = o.__setters?.[t.name] && env.accessorName !== t.name ? o.__setters[t.name] : null;
+      if (setter) return { get: async () => await readMember(o, { name: t.name, token: t.token }, env), set: async v => await setter(v) };
       return { get: () => (hasOwn(o, t.name) ? o[t.name] : null), set: v => {
-        o[t.name] = v;
         let frame = env;
         while (frame && frame.instance !== o) frame = frame.parent;
         let binding = frame && frame.values.get(t.name);
-        if (frame && !binding) binding = frame.define(t.name, v, true, typeOf(v), t.token);
+        if (frame && !binding) binding = frame.define(t.name, hasOwn(o, t.name) ? o[t.name] : v, true, typeOf(v), t.token);
+        if (binding && !binding.mutable) throw new CITError(`Cannot reassign immutable field '${t.name}'.`, t.token.line, t.token.column);
+        o[t.name] = v;
         if (binding) binding.value = v;
         if (visibility) {
           let fields = FIELD_ACCESS.get(o);
@@ -1729,19 +2330,37 @@ async function run(source, output = () => {}, input = async prompt => '', option
   }
 
   async function assign(s, env) {
+    if (s.target.kind === 'variable' && s.target.name.startsWith('$') && !env.find(s.target.name) && s.op === '=') {
+      const value = await ev(s.expr, env);
+      env.define(s.target.name, value, true, typeOf(value), s.target.token);
+      return;
+    }
+    if (s.target.kind === 'pattern') {
+      const value = await ev(s.expr, env);
+      if (!Array.isArray(value)) throw new CITError('A destructuring assignment needs a list or tuple on the right side.', s.token.line, s.token.column);
+      if (value.length !== s.target.items.length) throw new CITError(`Destructuring expected ${s.target.items.length} values but received ${value.length}.`, s.token.line, s.token.column);
+      for (let i = 0; i < s.target.items.length; i++) {
+        const target = s.target.items[i];
+        if (target) {
+          if (target.kind !== 'variable') throw new CITError('Destructuring targets must be variable names.', s.token.line, s.token.column);
+          if (target.name !== '_') env.set(target.name, value[i], target.token);
+        }
+      }
+      return;
+    }
     const compound = s.op !== '=';
     const rhs = await ev(s.expr, env);
     const target = await resolveTarget(s.target, env, s.visibility);
-    target.set(compound ? binaryOp(s.op.slice(0, -1), target.get(), rhs, s.token) : rhs);
+    await target.set(compound ? binaryOp(s.op.slice(0, -1), await target.get(), rhs, s.token) : rhs);
   }
 
   // n++  ++n  n--  --n   (prefix gives the new value, postfix gives the old one)
   async function update(e, env) {
     const target = await resolveTarget(e.target, env);
-    const old = target.get();
+    const old = await target.get();
     if (typeof old !== 'number') throw new CITError(`'${e.op}' needs a number, but the value is ${typeOf(old)}.`, e.token.line, e.token.column);
     const next = old + (e.op === '++' ? 1 : -1);
-    target.set(next);
+    await target.set(next);
     return e.prefix ? next : old;
   }
 
@@ -1754,6 +2373,19 @@ async function run(source, output = () => {}, input = async prompt => '', option
       switch (s.kind) {
         case 'empty': case 'pass': break;
         case 'block': { const r = await exec(s.body, new Env(env)); if (r) return r; break; }
+        case 'styleRule': {
+          if (!collectingStyles) throw new CITError('Style selectors can only be used inside a style block.', s.token.line, s.token.column);
+          const properties = {};
+          for (const statement of s.body) {
+            if (statement.kind !== 'assign' || statement.target.kind !== 'variable' || statement.op !== '=') {
+              throw new CITError('Style blocks only support property assignments.', s.token.line, s.token.column);
+            }
+            const name = statement.target.name.replace(/^\$/, '');
+            properties[name] = await ev(statement.expr, env);
+          }
+          collectingStyles.push({ selector: s.selector, properties });
+          break;
+        }
         case 'with': {
           const resource = await ev(s.resource, env), scope = new Env(env);
           scope.define(s.name.value, resource, false, typeOf(resource), s.name);
@@ -1767,21 +2399,62 @@ async function run(source, output = () => {}, input = async prompt => '', option
         case 'declare': {
           const values = [];
           if (s.exprs) for (const x of s.exprs) values.push(await ev(x, env));
-          s.names.forEach((n, i) => {
-            const valueIndex = s.broadcast ? 0 : i;
-            const v = s.exprs ? values[valueIndex] : null;       // empty variables start as null
-            if (v && v.kind === 'function' && !v.name && s.exprs[valueIndex].kind === 'lambda') v.name = n.value;   // let f = x => x  is called "f"
+          let unpacked = null;
+          if (s.pattern && values[0] !== undefined) {
+            if (!Array.isArray(values[0]) || values[0].length !== s.pattern.length) throw new CITError('A destructuring declaration needs a list or tuple with the same number of items.', s.token.line, s.token.column);
+            unpacked = values[0];
+          } else if (s.broadcast && values[0] !== undefined && Array.isArray(values[0]) && values[0].length === s.names.length) {
+            unpacked = values[0];
+          }
+          const declareName = (n, v, expr) => {
+            if (v && v.kind === 'function' && !v.name && expr?.kind === 'lambda') v.name = n.value;
             if (n.value === '_') return;
             const temporal = s.temporal ? {
               unit: s.temporal.unit,
-              expiresAt: s.temporal.unit === 's' ? startedAt + s.temporal.amount * 1000 : null,
-              expiresLine: s.temporal.unit === 'l' ? n.line + s.temporal.amount : null
+              amount: s.temporal.amount,
+              mode: s.temporal.mode || null,
+              expiresAt: s.temporal.unit === 's' && s.temporal.mode !== 'offline' ? startedAt + s.temporal.amount * 1000 : null,
+              lastUsedAt: Date.now(),
+              remainingReads: s.temporal.unit === 'r' ? s.temporal.amount : null,
+              expiresLine: s.temporal.unit === 'l' ? n.line + s.temporal.amount : null,
+              isIdle: options.isUserIdle
             } : null;
-            env.define(n.value, v, s.mutable, typeOf(v), n, temporal);
+            if (s.isStatic) {
+              let root = env;
+              while (root.parent) root = root.parent;
+              const key = `\u0000static:${env.functionId || 'global'}:${n.value}`;
+              let binding = root.values.get(key);
+              if (!binding) {
+                binding = { value: v, mutable: s.mutable, type: typeOf(v), temporal, width: null };
+                root.values.set(key, binding);
+              }
+              env.values.set(n.value, binding);
+            } else {
+              const binding = env.define(n.value, v, s.mutable, typeOf(v), n, temporal);
+              if (s.visibility && env.instance) {
+                env.instance[n.value] = v;
+                let fields = FIELD_ACCESS.get(env.instance);
+                if (!fields) { fields = new Map(); FIELD_ACCESS.set(env.instance, fields); }
+                const access = { visibility: s.visibility, owner: env.className };
+                fields.set(n.value, access);
+                binding.fieldAccess = access;
+              }
+            }
+          };
+          if (s.pattern) {
+            s.pattern.forEach((n, i) => { if (n) declareName(n, unpacked ? unpacked[i] : null, s.exprs?.[0]); });
+          } else s.names.forEach((n, i) => {
+            const valueIndex = unpacked ? i : s.broadcast ? 0 : i;
+            declareName(n, s.exprs ? (unpacked ? unpacked[i] : values[valueIndex]) : null, s.exprs?.[valueIndex]);
           });
           break;
         }
-        case 'typed': { const v = await ev(s.expr, env); env.define(s.name, checked(v, s.type, s.token), false, s.type, s.token); break; }
+        case 'typed': {
+          let v = checked(await ev(s.expr, env), s.type, s.token);
+          if (s.width) v = castWidth(v, s.width, s.token);
+          env.define(s.name, v, false, s.type, s.token, null, s.width);
+          break;
+        }
         case 'assign': await assign(s, env); break;
         case 'println': case 'errorln': case 'warnln':
           {
@@ -1793,7 +2466,13 @@ async function run(source, output = () => {}, input = async prompt => '', option
         case 'expr': await ev(s.expr, env); break;
         case 'function':
           {
-            let fn = { kind: 'function', name: s.name, params: s.params, body: s.body, uiTitle: s.uiTitle, closure: env };
+            let fn = { kind: 'function', name: s.name, params: s.params, body: s.body, uiTitle: s.uiTitle, styleTitle: s.styleTitle, closure: env, staticId: `function-${nextFunctionId++}` };
+            if (s.styleTitle) {
+              const title = await ev(s.styleTitle, env);
+              if (typeof title !== 'string') throw new CITError('style.title must be a string.', s.token.line, s.token.column);
+              fn.styleTitle = title;
+              styleDefinitions.set(title, fn);
+            }
             for (const decorator of (s.decorators || []).reverse()) {
               const target = await ev(decorator, env);
               fn = await callValue(target, [{ name: null, value: fn }], env, 'decorator', s.token);
@@ -1821,13 +2500,20 @@ async function run(source, output = () => {}, input = async prompt => '', option
           if (s.parent) {
             parent = env.get(s.parent.value, s.parent);
             if (!parent || parent.kind !== 'class') throw new CITError(`'${s.parent.value}' is not a class, so it cannot be a parent class.`, s.parent.line, s.parent.column);
+            if (parent.final) throw new CITError(`Cannot inherit from final class '${parent.name}'.`, s.parent.line, s.parent.column);
           }
-          const methods = {};
+          const methods = {}, fields = {}, getters = {}, setters = {};
           for (const m of s.body) {
-            if (m.kind !== 'function') throw new CITError('Only methods can be declared directly inside a class.');
-            methods[m.name] = { kind: 'function', name: m.name, params: m.params, body: m.body, closure: null };
+            if (m.kind === 'function') {
+              const fn = { kind: 'function', name: m.name, params: m.params, body: m.body, closure: null, accessor: m.accessor, staticId: `method-${nextFunctionId++}` };
+              if (m.accessor === 'get') getters[m.name] = fn;
+              else if (m.accessor === 'set') setters[m.name] = fn;
+              else methods[m.name] = fn;
+            } else if (m.kind === 'declare' && m.names.length === 1 && m.exprs?.length === 1) {
+              fields[m.names[0].value] = { expr: m.exprs[0], mutable: m.mutable, visibility: m.visibility || null, token: m.names[0] };
+            } else throw new CITError('A class can contain methods and initialized fields only.', s.token.line, s.token.column);
           }
-          env.define(s.name, { kind: 'class', name: s.name, methods, parent }, false, 'class', s.token);
+          env.define(s.name, { kind: 'class', name: s.name, methods, getters, setters, fields, parent, final: s.final }, false, 'class', s.token);
           break;
         }
         case 'if': {
@@ -1835,6 +2521,14 @@ async function run(source, output = () => {}, input = async prompt => '', option
           if (!chosen) for (const b of s.elseif) if (truthy(await ev(b.condition, env))) { chosen = b.body; break; }
           if (!chosen) chosen = s.no;
           if (chosen) { const r = await exec(chosen, new Env(env)); if (r) return r; }
+          break;
+        }
+        case 'guard': {
+          if (!truthy(await ev(s.condition, env))) {
+            const result = await exec(s.body, new Env(env));
+            if (result) return result;
+            throw new CITError('A failed guard must return, break, continue, or raise.', s.body[0]?.token?.line || 1, s.body[0]?.token?.column || 1);
+          }
           break;
         }
         case 'switch': {
@@ -1876,15 +2570,17 @@ async function run(source, output = () => {}, input = async prompt => '', option
           if (!vals.every(Number.isInteger)) throw new CITError('The values in range(...) must be integers.', s.token.line, s.token.column);
           const [start, end, step] = vals.length === 1 ? [0, vals[0], 1] : vals.length === 2 ? [vals[0], vals[1], 1] : vals;
           if (step === 0) throw new CITError('The step in range(...) cannot be 0.', s.token.line, s.token.column);
+          let didBreak = false;
           for (let i = start; step > 0 ? i < end : i > end; i += step) {
             tick('Loop limit exceeded.');
             const loopEnv = new Env(env);
             if (s.name !== '_') loopEnv.define(s.name, i, s.mutable, 'int', s.token);
             const r = await exec(s.body, loopEnv);
-            if (r?.type === BREAK) break;
+            if (r?.type === BREAK) { didBreak = true; break; }
             if (r?.type === CONTINUE) continue;
             if (r) return r;
           }
+          if (!didBreak && s.otherwise) { const result = await exec(s.otherwise, new Env(env)); if (result) return result; }
           break;
         }
         case 'forin': {
@@ -1893,15 +2589,17 @@ async function run(source, output = () => {}, input = async prompt => '', option
           if (Array.isArray(source) || typeof source === 'string' || source instanceof Set) items = [...source];     // a copy, so the loop is safe if the list changes
           else if (source instanceof Map) items = [...source.keys()];                      // dictionaries loop over their keys
           else throw new CITError(`Cannot loop over a ${typeOf(source)}. Use a list, string or dictionary.`, s.token.line, s.token.column);
+          let didBreak = false;
           for (const item of items) {
             tick('Loop limit exceeded.');
             const loopEnv = new Env(env);
             if (s.name !== '_') loopEnv.define(s.name, item, s.mutable, typeOf(item), s.token);
             const r = await exec(s.body, loopEnv);
-            if (r?.type === BREAK) break;
+            if (r?.type === BREAK) { didBreak = true; break; }
             if (r?.type === CONTINUE) continue;
             if (r) return r;
           }
+          if (!didBreak && s.otherwise) { const result = await exec(s.otherwise, new Env(env)); if (result) return result; }
           break;
         }
         case 'try': {
@@ -1949,7 +2647,8 @@ async function run(source, output = () => {}, input = async prompt => '', option
         }
         case 'import': {
           const mod = await loadModule(s.path, s.token);
-          env.define(s.alias || defaultAlias(s.path), mod, false, 'module', s.token);
+          const alias = s.alias || defaultAlias(s.path);
+          env.define(alias, mod, false, 'module', s.token);
           break;
         }
         case 'importMany': {
@@ -1957,6 +2656,12 @@ async function run(source, output = () => {}, input = async prompt => '', option
             const mod = await loadModule(name, s.token);
             env.define(defaultAlias(name), mod, false, 'module', s.token);
           }
+          break;
+        }
+        case 'fromImport': {
+          const mod = await loadModule(s.module, s.token);
+          if (!hasOwn(mod, s.name)) throw new CITError(`Module '${s.module}' has no export '${s.name}'.`, s.token.line, s.token.column);
+          env.define(s.name, mod[s.name], false, typeOf(mod[s.name]), s.token);
           break;
         }
         case 'break': return { type: BREAK };

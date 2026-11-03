@@ -1,8 +1,8 @@
 {
   "name": "cit-language",
-  "displayName": "CIT - Code Information Technology",
-  "description": "CIT language support: collections, temporal variables, classes, math/UI modules, terminal tools, formatting and the Look 'n learn guide.",
-  "version": "0.8.3",
+  "displayName": "CIT 1 Gen - Code Information Technology",
+  "description": "CIT 1 Gen language support with a bundled runtime, editor tooling, UI, and the Look 'n learn guide.",
+  "version": "1.0.0",
   "scripts": {
     "test": "node --test"
   },

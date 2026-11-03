@@ -1,4 +1,4 @@
-# CIT — Code Information Technology v0.8.2
+# CIT — Code Information Technology v0.8.3
 
 CIT is a small, readable programming language with its own VS Code extension, a built-in compiler and interpreter, a formatter and a package manager. Files end in `.cit` or `.ct`.
 
@@ -6,7 +6,7 @@ CIT is a small, readable programming language with its own VS Code extension, a 
 
 1. Open VS Code Extensions (`Ctrl+Shift+X`).
 2. Open the `...` menu and choose **Install from VSIX...**.
-3. Select `cit-language-0.8.2.vsix`.
+3. Select `cit-language-0.8.3.vsix`.
 4. Open a `.cit` or `.ct` file; VS Code automatically selects CIT.
 5. Run using the editor's Play icon, the context menu, or `Ctrl+F5`.
 
@@ -14,21 +14,23 @@ F5 is only needed when developing/debugging the extension itself.
 
 ## Learn CIT
 
-- **`Look 'n learn`** is a 15-chapter guide that explains every function and every part of the language, with runnable examples. Run **CIT: Open Look 'n learn (Docs)** from the Command Palette, or open `Look 'n learn/README.md`.
+- **`Look 'n learn`** is a 20-chapter guide covering the language, collections, math, decorators, UI, files and CLI. Run **CIT: Open Look 'n learn (Docs)** from the Command Palette, or open `Look 'n learn/README.md`.
 - **`examples`** has one runnable program for each chapter (`01-hello-world.cit` to `15-mini-project.cit`), plus a guessing game.
 
 ## What the language has
 
-- Variables: `let`, `let mut`, typed (`int`, `float`, `str`, `char`, `bool`), empty variables (`let mut name`), multiple assignment (`let a, b, c = 2, 3, 4`).
+- Variables: `let`, `let mut`, typed (`int`, `float`, `str`, `char`, `bool`), empty variables (`let mut name`), multiple assignment (`let a, b, c = 2, 3, 4`) and shared values (`let mut a, b, c = 2`).
 - Operators: `+ - * / % // **`, comparisons, `&&` `||` `!`, the `in` operator, shortcuts (`+=`, `-=`, `*=`, `/=`, `%=`, `**=`, `//=`) and `n++` `++n` `n--` `--n`. (`and`, `or`, `not` were removed.)
-- Control flow: `if` / `elseif` / `else`, `switch` / `case`, `while`, `do { } while ( )`, `for (let i, range(0, 12))`, `for (let mut i, range(0, 12, 2))`, `for (let item in list)`, `break`, `continue`, `pass`, `return`.
+- Control flow: `if` / `elseif` / `else`, ternary expressions, `switch` / `case`, `while`, `do { } while ( )`, `for` with optional bindings, `break`, `continue`, `pass`, `return`.
 - Strings: `"text"`, `$"Hello, {name}!"`, multi-line `"""..."""`, and 18 string methods.
-- Lists (18 methods, including `map` / `filter` / `reduce`), dictionaries (11 methods), numbers with `toFixed`.
+- Lists, dictionaries, heterogeneous sets and immutable tuples; constructors include `list`, `tuple`, `set`, `dict`, `frozendict` and `frozenset`.
 - Functions with default and named arguments (`name: value` or `name = value`), lambdas (`x => x * x`), closures, function values, `defer`.
-- Classes with `fn struct(...)`, `self`, inheritance (`class builder(person())`) and `super()`.
-- Errors: `try` / `catch` / `throw`, safe navigation `value?.method()`, `castInt(text, fallback = 0)`.
-- Built-ins: `println`, `warnln`, `errorln`, `input`, `castInt`, `castFloat`, `castString`, `castBool`, `range`, `min`, `max`, `sum`, `len`, `random`, `randint`.
-- Modules: `import "./file"`, `import "package"`, and the `ipcit` package manager.
+- Classes with `fn struct(...)`, `self`, inheritance, `super()`, and `private` / `protected` fields; decorated functions and enums.
+- Errors: `try` / `catch` / typed `except` / `finally`, `raise`, safe navigation and conversion fallbacks.
+- Modules: `import math`, `import ui`, multiple imports, local/package imports and the `ipcit` package manager.
+- Math and utility functions: `printf`, `exchange`, `task.wait`, `zip`, `enumerate`, `type`, `round`, `id`, `isinstance`, `issubclass`, `bin` and `square`.
+- Temporal variables expire after `<Ns>` seconds or `<Nl>` source lines.
+- UI elements render in a basic HTML-style VS Code webview; `open(..., "write"/"append")` saves UTF-8 text files.
 
 ## Running
 
@@ -43,7 +45,9 @@ In the terminal:
 - `input("Prompt")` is typed right in the terminal: type your answer and press Enter. Backspace works.
 - `Ctrl+C` stops a running program. Running again reuses the same terminal.
 
-The `cit <file.cit>` command does the same from any terminal opened inside VS Code (needs Node.js installed).
+The `cit <file.cit>` command runs a program from a VS Code terminal. To enable it in Windows Command Prompt or PowerShell, install Node.js and run `npm.cmd link` once from the extension project folder.
+
+The CLI also supports `cit --open trm`, `cit --crt file --nm main.cit`, `cit --enter main.cit` and `cit --dlt main.cit`.
 
 ## Format Document
 
@@ -82,4 +86,4 @@ Packages are installed to `cit_packages/` and recorded in `ipcit.json`. Use them
 
 ## Syntax highlighting
 
-CIT uses the same standard TextMate scopes as mainstream languages, so it matches your theme: keywords (`if`, `try`, `defer`...), `let` / `fn` / `class`, strings (including multi-line ones), numbers, comments, `true` / `false` / `null`, built-in functions, and list / dictionary / string / number methods. Variable names, dictionary keys, punctuation and brackets are intentionally left uncolored.
+CIT uses standard TextMate scopes, so it matches your theme. Hover over common keywords and built-ins for definitions; use **Go to Definition** (`F12` or `Ctrl+Click`) for local declarations.

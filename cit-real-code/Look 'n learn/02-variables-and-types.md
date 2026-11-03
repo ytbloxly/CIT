@@ -189,6 +189,19 @@ two one
 
 You can also create several empty variables: `let mut a, b`.
 
+One value can be shared across several names:
+
+```cit
+let mut a, b, c = 2
+println(a, b, c)
+```
+
+Output:
+
+```text
+2 2 2
+```
+
 ## Scope: where a variable lives
 
 A variable exists from its declaration until the end of the `{ ... }` block it was created in.

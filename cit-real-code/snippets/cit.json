@@ -289,5 +289,142 @@
       "randint(${1:1}, ${2:100})"
     ],
     "description": "Random integer (inclusive)"
+  },
+  "CIT Temporal Variable": {
+    "prefix": "temporal",
+    "body": [
+      "let mut ${1:name} <${2:2}${3|s,l|}> = ${4:value}"
+    ],
+    "description": "Declare a variable that expires after seconds (s) or source lines (l)"
+  },
+  "CIT Set": {
+    "prefix": "setliteral",
+    "body": [
+      "let mut ${1:values} = {${2:1, 2, 3}}"
+    ],
+    "description": "Create a set of unique values"
+  },
+  "CIT Tuple": {
+    "prefix": "tupleliteral",
+    "body": [
+      "let ${1:values} = (${2:1}, ${3:2})"
+    ],
+    "description": "Create an immutable tuple"
+  },
+  "CIT Discard Loop Value": {
+    "prefix": "forignore",
+    "body": [
+      "for (_, range(${1:0}, ${2:12})) {",
+      "\t${0:println(\"Hello\")}",
+      "}"
+    ],
+    "description": "Loop without binding the range value"
+  },
+  "CIT Conditional Expression": {
+    "prefix": "ternary",
+    "body": [
+      "${1:\"Even\"} if (${2:condition}) else ${3:\"Odd\"}"
+    ],
+    "description": "Choose a value with an inline if/else expression"
+  },
+  "CIT Math Import": {
+    "prefix": "math",
+    "body": [
+      "import math",
+      "math.${1|sqrt,ceil,floor,log,sin,cos|}(${2:value})"
+    ],
+    "description": "Import and use the built-in math module"
+  },
+  "CIT UI App": {
+    "prefix": "uiapp",
+    "body": [
+      "import ui",
+      "",
+      "fn app(ui.title = \"${1:My App}\") {",
+      "\treturn [",
+      "\t\tui.h1(\"${2:Hello World!}\"),",
+      "\t\tui.p(\"${3:Paragraph text}\")",
+      "\t]",
+      "}",
+      "",
+      "app().render()"
+    ],
+    "description": "Render a basic HTML-style UI in a VS Code webview"
+  },
+  "CIT File Write": {
+    "prefix": "filewrite",
+    "body": [
+      "with open(\"${1:notes.txt}\", \"${2|write,append|}\", encoding = \"utf-8\") as file {",
+      "\tfile.write(\"${3:Text}\\n\")",
+      "}"
+    ],
+    "description": "Write or append UTF-8 text to a file"
+  },
+  "CIT Enum": {
+    "prefix": "enum",
+    "body": [
+      "let enum ${1:colors} = ([",
+      "\t\"${2:red}\",",
+      "\t\"${3:blue}\"",
+      "])"
+    ],
+    "description": "Declare named enum values"
+  },
+  "CIT Decorator": {
+    "prefix": "decorator",
+    "body": [
+      "let ${1:logger} = fn ${1:logger}(original_func) {",
+      "\treturn args => {",
+      "\t\tprintln(\"Before the function starts...\")",
+      "\t\tlet result = original_func(args)",
+      "\t\tprintln(\"After the function starts...\")",
+      "\t\treturn result",
+      "\t}",
+      "}",
+      "",
+      "@${1:logger}",
+      "fn ${2:say_hello}(name) {",
+      "\tprintln($\"Hello, {name}!\")",
+      "}"
+    ],
+    "description": "Wrap a function with a decorator"
+  },
+  "CIT Multiple Import": {
+    "prefix": "importmany",
+    "body": [
+      "import {",
+      "\t${1:package1},",
+      "\t${2:package2}",
+      "}"
+    ],
+    "description": "Import several modules by name"
+  },
+  "CIT Shared Value Variables": {
+    "prefix": "letall",
+    "body": [
+      "let mut ${1:first}, ${2:second}, ${3:third} = ${4:value}"
+    ],
+    "description": "Initialize several variables with one shared value"
+  },
+  "CIT Raise Error": {
+    "prefix": "raise",
+    "body": [
+      "raise ${1|ValueError,TypeError,IndexError|}(\"${2:Invalid value}\")"
+    ],
+    "description": "Raise a typed error for an except clause"
+  },
+  "CIT Exchange": {
+    "prefix": "exchange",
+    "body": [
+      "let ${1:oldValue} = exchange(${2:mutableVariable}, ${3:newValue})"
+    ],
+    "description": "Replace a mutable variable and keep its former value"
+  },
+  "CIT Wait": {
+    "prefix": "taskwait",
+    "body": [
+      "task.wait(${1:2})"
+    ],
+    "description": "Pause a program for a number of seconds"
   }
 }

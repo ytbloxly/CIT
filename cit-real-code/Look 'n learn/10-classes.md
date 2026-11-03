@@ -85,6 +85,29 @@ null
 <point object>
 ```
 
+## Protected and private fields
+
+Prefix an assignment to `self` with `protected` or `private` to limit who can read the field:
+
+```cit
+class account() {
+    fn struct(bank, pin, balance) {
+        self.bank = bank
+        protected self.pin = pin
+        private self.balance = balance
+    }
+
+    fn show() {
+        println(bank, pin, balance)
+    }
+}
+
+let card = account("Chase", 1234, 12.34)
+card.show()
+```
+
+Methods in the declaring class can access both modifiers; subclasses can also access `protected` fields. Code outside the class cannot read or change either.
+
 ## Methods calling methods
 
 Inside a method, use `self.` to reach the object's other methods and properties.

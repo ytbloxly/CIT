@@ -165,6 +165,26 @@ Output:
 60
 ```
 
+### Ignore the loop value
+
+Use `_` when the loop's value is not needed. CIT does not create a variable for `_`; `let` may also be left off in this form:
+
+```cit
+for (_, range(0, 3)) {
+    println("Hello")
+}
+```
+
+Output:
+
+```text
+Hello
+Hello
+Hello
+```
+
+The loop variable can be `let mut` in either `range` or `for-in` loops when the body needs to reassign it.
+
 ### The old way
 
 Older versions wrote `for (let i, range = 0, 10)`. That form was replaced by `range(0, 10)` and gives a message telling you the new way:

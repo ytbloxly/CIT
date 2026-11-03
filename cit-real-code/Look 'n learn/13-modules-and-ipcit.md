@@ -50,6 +50,27 @@ Things to know:
 
 A working example is in the `examples` folder: `14-modules.cit`.
 
+### Built-in modules and multiple imports
+
+The standard `math` and `ui` modules do not need to be installed:
+
+```cit
+import math
+println(math.sqrt(16))
+```
+
+Import several packages or built-in modules in one statement:
+
+```cit
+import {
+    math,
+    ui,
+    ...
+}
+```
+
+The `...` is an optional visual placeholder; list the actual module names you want to import.
+
 ## Packages and `ipcit`
 
 `ipcit` is CIT's package manager. A **package** is a folder with an `ipcit.json` file that other projects can install.

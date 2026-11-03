@@ -1,11 +1,12 @@
 'use strict';
+const fs = require('fs');
+const path = require('path');
 
 /*
  * CIT interpreter (tokenizer, parser, evaluator).
  *
- * v0.8.2 adds: multi-line strings, for (let i, range(a, b, step)), try/catch/throw,
- * defer, the `in` operator, fallback for cast functions, random()/randint(),
- * number.toFixed(), and a real compile step (source -> AST) before running.
+ * v0.8.3 adds temporal variables, sets/tuples, math/UI modules, typed errors,
+ * decorators, enums, UTF-8 files, and additional built-ins.
  * The words and/or/not were removed: use && || !.
  */
 
@@ -16,6 +17,7 @@ class CITError extends Error {
     this.line = line;
     this.column = column;
   }
+
 }
 
 const BREAK = Symbol('break'), CONTINUE = Symbol('continue'), RETURN = Symbol('return');
@@ -29,6 +31,14 @@ const PRECEDENCE = new Map(Object.entries({
   '+': 5, '-': 5, '*': 6, '/': 6, '//': 6, '%': 6, '**': 7
 }));
 const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+const TUPLE = Symbol('CIT tuple');
+const READONLY = new WeakSet();
+const FIELD_ACCESS = new WeakMap();
+const mathGcd = (left, right) => {
+  left = Math.abs(left); right = Math.abs(right);
+  while (right) [left, right] = [right, left % right];
+  return left;
+};
 
 /* ------------------------------------------------------------------ */
 /* Tokenizer                                                           */
@@ -50,6 +60,7 @@ function multilineText(raw, ESC) {
 function tokenize(source) {
   const out = [];
   let i = 0, line = 1, col = 1;
+  if (source.charCodeAt(0) === 0xfeff) i++;
   const adv = () => { const c = source[i++]; if (c === '\n') { line++; col = 1; } else col++; return c; };
   const add = (type, value, l = line, c = col) => out.push({ type, value, line: l, column: c });
   const ESC = { n: '\n', r: '\r', t: '\t', '"': '"', "'": "'", '\\': '\\' };
@@ -135,13 +146,14 @@ function tokenize(source) {
 
     const three = source.slice(i, i + 3);
     if (three === '**=' || three === '//=') { adv(); adv(); adv(); add('operator', three, l, c); continue; }
+    if (three === '...') { adv(); adv(); adv(); add('punctuation', three, l, c); continue; }
     const two = source.slice(i, i + 2);
     if (['==', '!=', '<=', '>=', '&&', '||', '**', '//', '+=', '-=', '*=', '/=', '%=', '++', '--', '=>'].includes(two)) {
       adv(); adv(); add('operator', two, l, c); continue;
     }
     if (two === '?.') { adv(); adv(); add('punctuation', '?.', l, c); continue; }
     if ('+-*/%<>=!'.includes(ch)) { adv(); add('operator', ch, l, c); continue; }
-    if ('(){}[];,.:'.includes(ch)) { adv(); add('punctuation', ch, l, c); continue; }
+    if ('(){}[];,.:@'.includes(ch)) { adv(); add('punctuation', ch, l, c); continue; }
     if (ch === '$') { adv(); add('punctuation', '$', l, c); continue; }
     throw new CITError(`Unexpected character '${ch}'.`, l, c);
   }
@@ -196,9 +208,10 @@ class Parser {
     this.withArgs(() => {
       if (!this.check(')')) do {
         const p = this.ident('Expected parameter name.');
+        const name = p.value === 'ui' && this.match('.') ? `ui.${this.ident('Expected title after ui.').value}` : p.value;
         let def = null;
         if (this.match('=')) def = this.expression();
-        params.push({ name: p.value, default: def });
+        params.push({ name, default: def });
       } while (this.match(','));
     });
     this.consume(')');
@@ -213,6 +226,18 @@ class Parser {
     const mutable = this.match('mut');
     const names = [this.ident('Expected variable name after let.')];
     while (this.match(',')) names.push(this.ident("Expected another variable name after ','."));
+    let temporal = null;
+    if (this.match('<')) {
+      const duration = this.cur();
+      if (duration.type !== 'int' || !this.tokens[this.pos + 1] || !['s', 'l'].includes(this.tokens[this.pos + 1].value)) {
+        throw new CITError("Expected a temporal duration such as '<2s>' or '<30l>'.", duration.line, duration.column);
+      }
+      this.pos++;
+      temporal = { amount: duration.value, unit: this.cur().value };
+      this.pos++;
+      this.consume('>', "Expected '>' after the temporal duration.");
+      if (temporal.amount <= 0) throw new CITError('A temporal duration must be greater than 0.', duration.line, duration.column);
+    }
     const first = names[0];
     const list = names.map(n => n.value).join(', ');
 
@@ -220,19 +245,50 @@ class Parser {
       if (!mutable) {
         throw new CITError(`'${list}' has no value, so it must be declared with 'let mut'. Example: let mut ${list}`, first.line, first.column);
       }
-      return { kind: 'declare', names, mutable, exprs: null };
+      return { kind: 'declare', names, mutable, exprs: null, temporal };
     }
     const exprs = [this.expression()];
     while (this.match(',')) exprs.push(this.expression());
-    if (exprs.length !== names.length) {
+    if (exprs.length !== names.length && !(exprs.length === 1 && names.length > 1)) {
       throw new CITError(`Expected ${names.length} value${names.length === 1 ? '' : 's'} for ${list} but found ${exprs.length}.`, first.line, first.column);
     }
-    return { kind: 'declare', names, mutable, exprs };
+    return { kind: 'declare', names, mutable, exprs, temporal, broadcast: exprs.length === 1 && names.length > 1 };
   }
 
   statement() {
     if (this.match(';')) return { kind: 'empty' };
-    if (this.check('let')) return this.declaration();
+    if (this.check('private') || this.check('protected')) {
+      const visibility = this.cur().value;
+      const modifier = this.cur(); this.pos++;
+      const statement = this.statement();
+      if (statement.kind !== 'assign' || statement.target.kind !== 'member' || statement.target.object.kind !== 'variable' || statement.target.object.name !== 'self') {
+        throw new CITError(`${visibility} can only be used on a self field assignment inside a class.`, modifier.line, modifier.column);
+      }
+      statement.visibility = visibility;
+      return statement;
+    }
+    if (this.check('let')) {
+      if (this.peek()?.value === 'enum') {
+        this.consume('let');
+        this.consume('enum');
+        const name = this.ident('Expected an enum name.');
+        this.consume('=');
+        return { kind: 'enum', name: name.value, expr: this.expression(), token: name };
+      }
+      return this.declaration();
+    }
+
+    if (this.match('@')) {
+      const decorators = [];
+      do {
+        const name = this.ident('Expected a decorator name after @');
+        decorators.push({ kind: 'variable', name: name.value, token: name });
+      } while (this.match('@'));
+      const decorated = this.statement();
+      if (decorated.kind !== 'function') throw new CITError('Decorators can only be applied to functions.', this.cur().line, this.cur().column);
+      decorated.decorators = decorators;
+      return decorated;
+    }
 
     if (this.cur().type === 'identifier' && TYPE_WORDS.includes(this.cur().value)) {
       const type = this.cur().value; this.pos++;
@@ -244,7 +300,8 @@ class Parser {
     if (this.match('fn')) {
       const n = this.ident('Expected function name.');
       const params = this.params();
-      return { kind: 'function', name: n.value, params, body: this.block(), token: n };
+      const title = params.find(p => p.name === 'ui.title');
+      return { kind: 'function', name: n.value, params: params.filter(p => p.name !== 'ui.title'), uiTitle: title?.default || null, body: this.block(), token: n };
     }
 
     // class name() { ... }     class child(parent()) { ... }
@@ -269,6 +326,13 @@ class Parser {
     }
 
     if (this.match('while')) { const condition = this.condition(); return { kind: 'while', condition, body: this.block() }; }
+
+    if (this.match('with')) {
+      const resource = this.expression();
+      this.consume('as', "Expected 'as' and a variable name after the resource.");
+      const name = this.ident('Expected a resource variable name.');
+      return { kind: 'with', resource, name, body: this.block() };
+    }
 
     if (this.match('do')) {
       const body = this.block();
@@ -302,7 +366,7 @@ class Parser {
     // for (let i, range(0, 10)) { }    for (let mut i, range(0, 10, 2)) { }    for (let item in list) { }
     if (this.match('for')) {
       this.consume('(');
-      this.consume('let', "Expected 'let' in for loop.");
+      this.match('let');
       const mutable = this.match('mut');
       const n = this.ident('Expected loop variable.');
       if (this.match('in')) {
@@ -324,18 +388,40 @@ class Parser {
       return { kind: 'for', name: n.value, mutable, args, body: this.block(), token: n };
     }
 
-    // try { } catch (err) { }
+    // try { } catch (err) { } except ValueError as err { } finally { }
     if (this.match('try')) {
       const body = this.block();
-      this.consume('catch', "Expected 'catch' after the try block.");
-      let name = null;
-      if (this.match('(')) { name = this.ident('Expected a name for the error, for example catch (err).'); this.consume(')'); }
-      return { kind: 'try', body, name, handler: this.block() };
+      const handlers = [];
+      while (this.match('catch', 'except')) {
+        const keyword = this.tokens[this.pos - 1].value;
+        let errorType = null, name = null;
+        if (keyword === 'catch') {
+          if (this.match('(')) { name = this.ident('Expected a name for the error, for example catch (err).'); this.consume(')'); }
+        } else {
+          errorType = this.ident('Expected an error type after except.').value;
+          if (this.match('as')) name = this.ident('Expected a name after as.');
+          else if (this.match('(')) { name = this.ident('Expected an error variable.'); this.consume(')'); }
+        }
+        handlers.push({ errorType, name, body: this.block() });
+      }
+      const finallyBody = this.match('finally') ? this.block() : null;
+      if (!handlers.length && !finallyBody) throw new CITError("Expected 'catch', 'except' or 'finally' after the try block.", this.cur().line, this.cur().column);
+      return { kind: 'try', body, handlers, finallyBody };
     }
 
     if (this.check('throw') && this.cur().type === 'identifier') {
       const t = this.cur(); this.pos++;
       return { kind: 'throw', expr: this.expression(), token: t };
+    }
+
+    if (this.match('raise')) {
+      const errorType = this.ident('Expected an error type after raise.');
+      let expr = { kind: 'literal', value: errorType.value, litType: 'string', token: errorType };
+      if (this.match('(')) {
+        if (!this.check(')')) expr = this.expression();
+        this.consume(')');
+      }
+      return { kind: 'throw', expr, errorType: errorType.value, token: errorType };
     }
 
     // defer <statement>: runs when the surrounding function ends
@@ -348,7 +434,17 @@ class Parser {
 
     if (this.match('import')) {
       const t = this.cur();
-      if (t.type !== 'string') throw new CITError("Expected a package or file name in quotes after 'import'.", t.line, t.column);
+      if (this.match('{')) {
+        const names = [];
+        while (!this.check('}')) {
+          if (this.match('...')) break;
+          names.push(this.ident('Expected a package name inside the import list.').value);
+          if (!this.match(',')) break;
+        }
+        this.consume('}', "Expected '}' to close the import list.");
+        return { kind: 'importMany', names, token: t };
+      }
+      if (t.type !== 'string' && !(t.type === 'identifier' && ['math', 'ui'].includes(t.value))) throw new CITError("Expected a package or file name after 'import'.", t.line, t.column);
       this.pos++;
       let alias = null;
       if (this.match('as')) alias = this.ident("Expected a name after 'as'.").value;
@@ -383,7 +479,14 @@ class Parser {
     return { kind: 'expr', expr };
   }
 
-  expression() { return this.binary(0); }
+  expression() {
+    const test = this.binary(0);
+    if (!this.check('if') || this.cur().line !== this.tokens[this.pos - 1].line) return test;
+    this.pos++;
+    const condition = this.condition();
+    this.consume('else', "Expected 'else' in the conditional expression.");
+    return { kind: 'conditional', test, condition, otherwise: this.expression() };
+  }
 
   binary(min) {
     let left;
@@ -523,6 +626,8 @@ class Parser {
       return { kind: 'literal', value: t.value, litType: t.type, token: t };
     }
 
+    if (this.match('_')) return { kind: 'literal', value: null, token: t };
+
     if (this.check('[')) {                                        // list
       this.pos++;
       const items = [];
@@ -531,8 +636,18 @@ class Parser {
       return { kind: 'list', items, token: t };
     }
 
-    if (this.check('{')) {                                        // dictionary: {name: "Coder", age: 24}
+    if (this.check('{')) {                                        // dictionary or set
       this.pos++;
+      if (this.check('}')) { this.pos++; return { kind: 'dict', entries: [], token: t }; }
+      if (this.peek()?.value !== ':') {
+        const items = [];
+        this.withArgs(() => {
+          items.push(this.expression());
+          while (this.match(',')) { if (!this.check('}')) items.push(this.expression()); }
+        });
+        this.consume('}', "Expected '}' to close the set.");
+        return { kind: 'set', items, token: t };
+      }
       const entries = [];
       this.withArgs(() => {
         while (!this.check('}')) {
@@ -550,7 +665,16 @@ class Parser {
       return { kind: 'dict', entries, token: t };
     }
 
-    if (this.match('(')) { const e = this.expression(); this.consume(')'); return e; }
+    if (this.match('(')) {
+      const first = this.expression();
+      if (!this.match(',')) { this.consume(')'); return first; }
+      const items = [first];
+      this.withArgs(() => {
+        do { if (this.check(')')) break; items.push(this.expression()); } while (this.match(','));
+      });
+      this.consume(')', "Expected ')' to close the tuple.");
+      return { kind: 'tuple', items, token: t };
+    }
     if (t.type === 'identifier') { this.pos++; return { kind: 'variable', name: t.value, token: t }; }
     throw new CITError(`Expected expression, found '${t.value || 'end of file'}'.`, t.line, t.column);
   }
@@ -565,8 +689,9 @@ function typeOf(v) {
   if (typeof v === 'boolean') return 'bool';
   if (typeof v === 'number') return Number.isInteger(v) ? 'int' : 'float';
   if (typeof v === 'string') return 'str';
-  if (Array.isArray(v)) return 'list';
+  if (Array.isArray(v)) return v[TUPLE] ? 'tuple' : 'list';
   if (v instanceof Map) return 'dict';
+  if (v instanceof Set) return 'set';
   if (typeof v === 'function') return 'function';
   if (v.kind === 'function') return 'function';
   if (v.kind === 'class') return 'class';
@@ -592,8 +717,9 @@ function formatKey(k) {
 function format(v, nested = false) {
   if (v === null || v === undefined) return 'null';
   if (typeof v === 'string') return nested ? JSON.stringify(v) : v;
-  if (Array.isArray(v)) return '[' + v.map(x => format(x, true)).join(', ') + ']';
+  if (Array.isArray(v)) return (v[TUPLE] ? '(' : '[') + v.map(x => format(x, true)).join(', ') + (v[TUPLE] ? ')' : ']');
   if (v instanceof Map) return '{' + [...v].map(([k, x]) => `${formatKey(k)}: ${format(x, true)}`).join(', ') + '}';
+  if (v instanceof Set) return '{' + [...v].map(x => format(x, true)).join(', ') + '}';
   if (typeof v === 'function') return '<function>';
   if (typeof v === 'object') {
     if (v.kind === 'function') return `<fn ${v.name || 'anonymous'}>`;
@@ -606,7 +732,9 @@ function format(v, nested = false) {
 }
 
 function valuesEqual(a, b) {
-  if (Array.isArray(a) && Array.isArray(b)) return a.length === b.length && a.every((x, i) => valuesEqual(x, b[i]));
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return Boolean(a[TUPLE]) === Boolean(b[TUPLE]) && a.length === b.length && a.every((x, i) => valuesEqual(x, b[i]));
+  }
   if (a instanceof Map && b instanceof Map) return a.size === b.size && [...a].every(([k, x]) => b.has(k) && valuesEqual(x, b.get(k)));
   return a === b;
 }
@@ -623,17 +751,35 @@ class Env {
   get(n, tok) {
     const e = this.find(n);
     if (!e) throw new CITError(`Undefined variable '${n}'.`, tok?.line || 1, tok?.column || 1);
-    return e.values.get(n).value;
+    const binding = e.values.get(n);
+    if (binding.fieldAccess) {
+      let context = this, className = null;
+      while (context && !className) { className = context.className || null; context = context.parent; }
+      const owner = binding.fieldAccess.owner;
+      const chain = e.instance?.__classChain || [];
+      const allowed = binding.fieldAccess.visibility === 'private'
+        ? className === owner
+        : className !== null && chain.includes(className) && chain.includes(owner);
+      if (!allowed) throw new CITError(`Cannot access ${binding.fieldAccess.visibility} field '${n}' outside its class.`, tok?.line || 1, tok?.column || 1);
+    }
+    if (binding.temporal) {
+      const expired = binding.temporal.unit === 's'
+        ? Date.now() >= binding.temporal.expiresAt
+        : (tok?.line || 1) > binding.temporal.expiresLine;
+      if (expired) throw new CITError(`Temporal variable '${n}' has expired.`, tok?.line || 1, tok?.column || 1);
+    }
+    return binding.value;
   }
-  define(n, v, mutable = true, type = typeOf(v), tok = { line: 1, column: 1 }) {
+  define(n, v, mutable = true, type = typeOf(v), tok = { line: 1, column: 1 }, temporal = null) {
     if (this.values.has(n)) throw new CITError(`'${n}' is already declared.`, tok.line, tok.column);
-    const b = { value: v, mutable, type };
+    const b = { value: v, mutable, type, temporal };
     this.values.set(n, b);
     return b;
   }
   set(n, v, tok = { line: 1, column: 1 }) {
     const e = this.find(n);
     if (!e) throw new CITError(`Undefined variable '${n}'.`, tok.line, tok.column);
+    this.get(n, tok);
     const x = e.values.get(n);
     if (!x.mutable) throw new CITError(`Cannot reassign immutable variable '${n}'. Use 'let mut'.`, tok.line, tok.column);
     if (x.type === 'null') {
@@ -861,7 +1007,7 @@ const NUMBER_METHODS = {
   } }
 };
 
-const BUILTINS = new Set(['input', 'castInt', 'castFloat', 'castString', 'castBool', 'range', 'min', 'max', 'sum', 'len', 'random', 'randint']);
+const BUILTINS = new Set(['input', 'castInt', 'castFloat', 'castString', 'castBool', 'range', 'min', 'max', 'sum', 'len', 'random', 'randint', 'list', 'tuple', 'set', 'dict', 'frozendict', 'frozenset', 'object', 'bin', 'zip', 'enumerate', 'enumarate', 'round', 'id', 'type', 'isinstance', 'issubclass', 'square', 'printf', 'exchange', 'sleep', 'open']);
 
 /* ------------------------------------------------------------------ */
 /* Interpreter                                                         */
@@ -880,12 +1026,20 @@ async function run(source, output = () => {}, input = async prompt => '', option
     const line = String(msg);
     if (kind === 'errorln') output(`[ERROR] ${line}`, 'error');
     else if (kind === 'warnln') output(`[WARNING] ${line}`, 'warn');
+    else if (kind === 'print') output(line, 'print');
     else output(line, 'out');
   };
   const cancelled = () => typeof options.isCancelled === 'function' && options.isCancelled();
   let currentDir = options.baseDir || null;
   const moduleCache = new Map(), loading = new Set();
   const SHORT = Symbol('short-circuit');      // result of a ?. chain that hit null
+  const startedAt = Date.now();
+  global.define('task', { wait: seconds => {
+    if (typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds < 0) throw new CITError('task.wait() needs a non-negative number of seconds.');
+    return new Promise(resolve => setTimeout(resolve, seconds * 1000));
+  } }, false, 'module');
+  let nextObjectId = 1;
+  const objectIds = new WeakMap(), primitiveIds = new Map();
 
   /* ---- expressions ---- */
 
@@ -895,7 +1049,16 @@ async function run(source, output = () => {}, input = async prompt => '', option
     switch (e.kind) {
       case 'literal': return e.litType === 'template' ? interpolate(e.value, env) : e.value;
       case 'variable': return env.get(e.name, e.token);
+      case 'conditional': return truthy(await ev(e.condition, env)) ? ev(e.test, env) : ev(e.otherwise, env);
       case 'list': { const out = []; for (const item of e.items) out.push(await ev(item, env)); return out; }
+      case 'tuple': {
+        const out = [];
+        for (const item of e.items) out.push(await ev(item, env));
+        Object.defineProperty(out, TUPLE, { value: true });
+        Object.freeze(out);
+        return out;
+      }
+      case 'set': { const out = new Set(); for (const item of e.items) out.add(await ev(item, env)); return out; }
       case 'dict': {
         const d = new Map();
         for (const en of e.entries) d.set(dictKey(await ev(en.key, env), en.key.token), await ev(en.value, env));
@@ -915,7 +1078,7 @@ async function run(source, output = () => {}, input = async prompt => '', option
         const o = await evx(e.object, env);
         if (o === SHORT) return SHORT;
         if (e.optional && (o === null || o === undefined)) return SHORT;
-        return readMember(o, e);
+        return readMember(o, e, env);
       }
       case 'update': return update(e, env);
       case 'unary': {
@@ -954,7 +1117,8 @@ async function run(source, output = () => {}, input = async prompt => '', option
     }
     if (Array.isArray(b)) return b.some(x => valuesEqual(x, a));
     if (b instanceof Map) return (typeof a === 'string' || typeof a === 'number' || typeof a === 'boolean') && b.has(a);
-    throw fail(`'in' needs a string, list or dictionary on the right side, not ${typeOf(b)}.`);
+    if (b instanceof Set) return [...b].some(x => valuesEqual(x, a));
+    throw fail(`'in' needs a string, list, set or dictionary on the right side, not ${typeOf(b)}.`);
   }
 
   // In info[name], a bare name that is not a variable is used as the key "name".
@@ -972,6 +1136,13 @@ async function run(source, output = () => {}, input = async prompt => '', option
       if (typeof a === 'string' && typeof b === 'string') return a + b;
       if (typeof a === 'number' && typeof b === 'number') return a + b;
       throw fail(`Invalid operands for '+' (${typeOf(a)} and ${typeOf(b)}).`);
+    }
+    if (['-', '*', '/', '//', '%', '**'].includes(op) && (typeof a !== 'number' || typeof b !== 'number')) {
+      throw fail(`Invalid operands for '${op}' (${typeOf(a)} and ${typeOf(b)}); both values must be numbers.`);
+    }
+    if (['<', '>', '<=', '>='].includes(op)
+      && !((typeof a === 'number' && typeof b === 'number') || (typeof a === 'string' && typeof b === 'string'))) {
+      throw fail(`Invalid operands for '${op}' (${typeOf(a)} and ${typeOf(b)}); compare two numbers or two strings.`);
     }
     if ((a !== null && typeof a === 'object') || (b !== null && typeof b === 'object') || typeof a === 'function' || typeof b === 'function') {
       throw fail(`Invalid operands for '${op}' (${typeOf(a)} and ${typeOf(b)}).`);
@@ -1007,7 +1178,16 @@ async function run(source, output = () => {}, input = async prompt => '', option
     return items[k];
   }
 
-  function readMember(o, e) {
+  function canAccessField(o, access, env) {
+    let frame = env, className = null;
+    while (frame && !className) { className = frame.className || null; frame = frame.parent; }
+    const chain = o.__classChain || [];
+    return access.visibility === 'private'
+      ? className === access.owner
+      : className !== null && chain.includes(className) && chain.includes(access.owner);
+  }
+
+  function readMember(o, e, env) {
     const tok = e.token || { line: 1, column: 1 };
     if (o === null || o === undefined) throw new CITError(`Cannot read '${e.name}' from null. Use ?. to skip null values (value?.${e.name}).`, tok.line, tok.column);
     if (Array.isArray(o)) {
@@ -1021,6 +1201,8 @@ async function run(source, output = () => {}, input = async prompt => '', option
     if (typeof o === 'number' && hasOwn(NUMBER_METHODS, e.name)) throw new CITError(`'${e.name}' is a number method. Call it like n.${e.name}(...).`, tok.line, tok.column);
     if (typeof o === 'string' && hasOwn(STRING_METHODS, e.name)) throw new CITError(`'${e.name}' is a string method. Call it like s.${e.name}(...).`, tok.line, tok.column);
     if (typeof o !== 'object') throw new CITError(`Cannot read '${e.name}' from a ${typeOf(o)}.`, tok.line, tok.column);
+    const access = FIELD_ACCESS.get(o)?.get(e.name);
+    if (access && !canAccessField(o, access, env)) throw new CITError(`Cannot access ${access.visibility} field '${e.name}' outside its class.`, tok.line, tok.column);
     if (o.__module && !hasOwn(o, e.name)) throw new CITError(`Module '${o.__module}' has no export '${e.name}'.`, tok.line, tok.column);
     return hasOwn(o, e.name) ? o[e.name] : null;
   }
@@ -1029,6 +1211,8 @@ async function run(source, output = () => {}, input = async prompt => '', option
   function requireMutable(objExpr, env, action, tok) {
     if (objExpr.kind !== 'variable') return;
     const b = env.binding(objExpr.name);
+    if (b && READONLY.has(b.value)) throw new CITError(`Cannot ${action} '${objExpr.name}' because it is read-only.`, tok.line, tok.column);
+    if (b && b.value && b.value[TUPLE]) throw new CITError(`Cannot ${action} '${objExpr.name}' because tuples are immutable.`, tok.line, tok.column);
     if (b && !b.mutable && !b.param) {
       throw new CITError(`Cannot ${action} '${objExpr.name}' because it was declared with 'let'. Use 'let mut ${objExpr.name}'.`, tok.line, tok.column);
     }
@@ -1062,6 +1246,16 @@ async function run(source, output = () => {}, input = async prompt => '', option
       if (obj === SHORT) return SHORT;
       const tok = callee.token || { line: 1, column: 1 };
       if (callee.optional && (obj === null || obj === undefined)) return SHORT;     // p?.talk()
+      if (Array.isArray(obj) && callee.name === 'render' && obj.some(item => item && item.__ui)) {
+        if (typeof options.renderUI === 'function') return options.renderUI(obj, obj.__uiTitle || 'CIT App');
+        const renderText = value => {
+          if (Array.isArray(value)) return value.map(renderText).filter(Boolean).join('\n');
+          if (value && value.__ui) return value.children.map(renderText).filter(Boolean).join('\n');
+          return value === null || value === undefined ? '' : format(value);
+        };
+        emit('println', [obj.__uiTitle, renderText(obj)].filter(Boolean).join('\n'));
+        return null;
+      }
       if (Array.isArray(obj)) return invokeMethod(obj, 'list', 'Lists', LIST_METHODS, e, env);
       if (obj instanceof Map) return invokeMethod(obj, 'dictionary', 'Dictionaries', DICT_METHODS, e, env);
       if (typeof obj === 'string') return invokeMethod(obj, 'string', 'Strings', STRING_METHODS, e, env);
@@ -1078,6 +1272,20 @@ async function run(source, output = () => {}, input = async prompt => '', option
     }
 
     if (callee.kind === 'variable') {
+      if (callee.name === 'exchange' && e.args.length === 2) {
+        const target = await resolveTarget(e.args[0].value, env);
+        const previous = target.get(), replacement = await ev(e.args[1].value, env);
+        target.set(replacement);
+        return previous;
+      }
+      if (callee.name === 'isinstance' && e.args.length === 2 && !env.find('isinstance')) {
+        const value = await ev(e.args[0].value, env);
+        const typeExpr = e.args[1].value;
+        const typeValue = typeExpr.kind === 'variable' && TYPE_WORDS.concat(['list', 'tuple', 'set', 'dict', 'module', 'object']).includes(typeExpr.name)
+          ? { __typeMarker: typeExpr.name }
+          : await ev(typeExpr, env);
+        return builtin('isinstance', [{ name: null, value }, { name: null, value: typeValue }], callee.token);
+      }
       const vals = [];
       for (const a of e.args) vals.push({ name: a.name, value: await ev(a.value, env) });
       const name = callee.name;
@@ -1132,8 +1340,8 @@ async function run(source, output = () => {}, input = async prompt => '', option
     const args = vals.filter(v => !v.name).map(v => v.value);
     const isCast = ['castInt', 'castFloat', 'castString', 'castBool'].includes(name);
     for (const n of named) {
-      if (!isCast) throw err(`${name}() does not take named arguments ('${n.name}').`);
-      if (n.name !== 'fallback') throw err(`${name}() has no argument named '${n.name}'. It accepts: fallback.`);
+      if (!isCast && name !== 'dict' && name !== 'frozendict' && !(name === 'open' && n.name === 'encoding')) throw err(`${name}() does not take named arguments ('${n.name}').`);
+      if (isCast && n.name !== 'fallback') throw err(`${name}() has no argument named '${n.name}'. It accepts: fallback.`);
     }
     const hasFallback = named.some(n => n.name === 'fallback');
     const fallback = hasFallback ? named.find(n => n.name === 'fallback').value : null;
@@ -1202,6 +1410,128 @@ async function run(source, output = () => {}, input = async prompt => '', option
         if (args.length !== 1 || !(Array.isArray(x) || typeof x === 'string' || x instanceof Map)) throw err('len() takes one list, string or dictionary.');
         return Array.isArray(x) ? x.length : x instanceof Map ? x.size : [...x].length;
       }
+      case 'list': return args.length === 1 && (Array.isArray(args[0]) || typeof args[0] === 'string') ? [...args[0]] : args;
+      case 'tuple': {
+        const values = args.length === 1 && Array.isArray(args[0]) ? [...args[0]] : args;
+        Object.defineProperty(values, TUPLE, { value: true });
+        return Object.freeze(values);
+      }
+      case 'set': case 'frozenset': {
+        const items = args.length === 1 && (Array.isArray(args[0]) || typeof args[0] === 'string') ? [...args[0]] : args;
+        const result = new Set(items);
+        if (name === 'frozenset') READONLY.add(result);
+        return result;
+      }
+      case 'dict': case 'frozendict': {
+        const result = new Map();
+        for (const arg of args) {
+          if (!Array.isArray(arg) || arg.length !== 2) throw err(`${name}() positional values must be key/value pairs.`);
+          result.set(dictKey(arg[0], tok), arg[1]);
+        }
+        for (const n of named) result.set(n.name, n.value);
+        if (name === 'frozendict') READONLY.add(result);
+        return result;
+      }
+      case 'object': return {};
+      case 'type': {
+        if (args.length !== 1) throw err('type() takes one value.');
+        return typeOf(args[0]);
+      }
+      case 'bin': {
+        if (args.length !== 1 || !Number.isInteger(args[0])) throw err('bin() needs one integer.');
+        return (args[0] < 0 ? '-0b' : '0b') + Math.abs(args[0]).toString(2);
+      }
+      case 'zip': {
+        if (!args.length || args.some(x => !(Array.isArray(x) || typeof x === 'string'))) throw err('zip() needs one or more lists or strings.');
+        const rows = [], length = Math.min(...args.map(x => x.length));
+        for (let i = 0; i < length; i++) rows.push(args.map(x => x[i]));
+        return rows;
+      }
+      case 'enumerate': case 'enumarate': {
+        if (args.length < 1 || args.length > 2 || !(Array.isArray(args[0]) || typeof args[0] === 'string')) throw err(`${name}() needs a list or string and an optional start index.`);
+        const start = args[1] === undefined ? 0 : args[1];
+        if (!Number.isInteger(start)) throw err(`${name}() start index must be an integer.`);
+        return [...args[0]].map((item, index) => [start + index, item]);
+      }
+      case 'round': {
+        if (args.length < 1 || args.length > 2 || typeof args[0] !== 'number') throw err('round() needs a number and an optional number of decimal places.');
+        const digits = args[1] === undefined ? 0 : args[1];
+        if (!Number.isInteger(digits) || digits < -100 || digits > 100) throw err('round() decimal places must be an integer between -100 and 100.');
+        const factor = 10 ** digits;
+        return Math.round((args[0] + Number.EPSILON) * factor) / factor;
+      }
+      case 'id': {
+        if (args.length !== 1) throw err('id() takes one value.');
+        const value = args[0];
+        if (value !== null && (typeof value === 'object' || typeof value === 'function')) {
+          if (!objectIds.has(value)) objectIds.set(value, nextObjectId++);
+          return objectIds.get(value);
+        }
+        const key = `${typeof value}:${String(value)}`;
+        if (!primitiveIds.has(key)) primitiveIds.set(key, nextObjectId++);
+        return primitiveIds.get(key);
+      }
+      case 'isinstance': {
+        if (args.length !== 2) throw err('isinstance() takes a value and a type name.');
+        const target = args[1];
+        if (target && target.kind === 'class') return Boolean(args[0]?.__classChain?.includes(target.name) || args[0]?.__class === target.name);
+        if (target && target.__typeMarker) return typeOf(args[0]) === target.__typeMarker;
+        if (typeof target === 'string') return typeOf(args[0]) === target || (args[0] && args[0].__class === target);
+        throw err('isinstance() type must be a type name or a class.');
+      }
+      case 'issubclass': {
+        if (args.length !== 2 || !(args[0]?.kind === 'class') || !(args[1]?.kind === 'class')) throw err('issubclass() needs two classes.');
+        for (let cls = args[0]; cls; cls = cls.parent) if (cls === args[1]) return true;
+        return false;
+      }
+      case 'square': {
+        if (args.length !== 1 || typeof args[0] !== 'number') throw err('square() needs one number.');
+        return args[0] ** 2;
+      }
+      case 'printf': {
+        if (!args.length || typeof args[0] !== 'string') throw err('printf() needs a format string.');
+        let index = 1;
+        const text = args[0].replace(/%%|%[sdif]/g, spec => {
+          if (spec === '%%') return '%';
+          if (index >= args.length) throw err('printf() has more format specifiers than values.');
+          const value = args[index++];
+          return spec === '%d' || spec === '%i' ? String(Math.trunc(Number(value))) : spec === '%f' ? String(Number(value)) : format(value);
+        });
+        if (index !== args.length) throw err('printf() has more values than format specifiers.');
+        emit('print', text);
+        return null;
+      }
+      case 'sleep': {
+        if (args.length !== 1 || typeof args[0] !== 'number' || args[0] < 0) throw err('sleep() needs one non-negative number of seconds.');
+        await new Promise(resolve => setTimeout(resolve, args[0] * 1000));
+        return null;
+      }
+      case 'open': {
+        if (args.length < 1 || args.length > 2 || typeof args[0] !== 'string') throw err('open() needs a file name and an optional mode.');
+        const mode = args[1] === undefined ? 'read' : args[1];
+        const encoding = named.find(item => item.name === 'encoding')?.value || 'utf-8';
+        if (!['read', 'write', 'append'].includes(mode)) throw err("open() mode must be 'read', 'write' or 'append'.");
+        if (!['utf-8', 'utf8'].includes(encoding)) throw err('open() currently supports UTF-8 text files only.');
+        const filePath = path.resolve(currentDir || process.cwd(), args[0]);
+        try {
+          if (mode === 'write') fs.writeFileSync(filePath, '', { encoding: 'utf8' });
+          if (mode === 'append' && !fs.existsSync(filePath)) fs.writeFileSync(filePath, '', { encoding: 'utf8' });
+        } catch (cause) { throw err(`Cannot open '${args[0]}': ${cause.message}`); }
+        return {
+          write(text) {
+            if (mode === 'read') throw new CITError('Cannot write to a file opened for reading.');
+            try { fs.appendFileSync(filePath, format(text), 'utf8'); }
+            catch (cause) { throw new CITError(`Cannot write '${args[0]}': ${cause.message}`); }
+            return null;
+          },
+          read() {
+            if (mode !== 'read') throw new CITError('Cannot read from a file opened for writing.');
+            try { return fs.readFileSync(filePath, 'utf8'); }
+            catch (cause) { throw new CITError(`Cannot read '${args[0]}': ${cause.message}`); }
+          },
+          close() { return null; }
+        };
+      }
     }
     throw err(`Unknown built-in '${name}'.`);
   }
@@ -1221,7 +1551,9 @@ async function run(source, output = () => {}, input = async prompt => '', option
     }
     return withDefers(local, async () => {
       const r = await exec(fn.body, local);
-      return r && r.type === RETURN ? r.value : null;
+      const value = r && r.type === RETURN ? r.value : null;
+      if (fn.uiTitle && Array.isArray(value)) Object.defineProperty(value, '__uiTitle', { value: format(await ev(fn.uiTitle, local)) });
+      return value;
     });
   }
 
@@ -1244,14 +1576,16 @@ async function run(source, output = () => {}, input = async prompt => '', option
   async function construct(cls, args, env) {
     const chain = [];
     for (let c = cls; c; c = c.parent) chain.unshift(c);          // root class first
-    const instance = { __class: cls.name };
+    const instance = { __class: cls.name, __classChain: chain.map(c => c.name) };
     const instanceEnv = new Env(env);
+    instanceEnv.instance = instance;
     instanceEnv.define('self', instance, false);
 
     const tables = [];
     let structFn = null, structEnv = null;
     chain.forEach((c, i) => {
       const levelEnv = new Env(instanceEnv);
+      levelEnv.className = c.name;
       levelEnv.define('super', async () => {
         if (i === 0) throw new CITError(`'${c.name}' has no parent class, so super() cannot be used.`);
         return parentView(i - 1);
@@ -1280,6 +1614,43 @@ async function run(source, output = () => {}, input = async prompt => '', option
   }
 
   async function loadModule(spec, tok) {
+    if (spec === 'math') {
+      const mathFunction = (name, minArgs, maxArgs, fn, integerArgs = []) => (...args) => {
+        if (args.length < minArgs || args.length > maxArgs) {
+          throw new CITError(`math.${name}() takes ${minArgs === maxArgs ? minArgs : `${minArgs} to ${maxArgs}`} value${maxArgs === 1 ? '' : 's'} but got ${args.length}.`, tok.line, tok.column);
+        }
+        if (args.some((value, index) => typeof value !== 'number' || (integerArgs.includes(index) && !Number.isInteger(value)))) {
+          const requirement = integerArgs.length ? 'numbers (integers where required)' : 'numbers';
+          throw new CITError(`math.${name}() needs ${requirement}.`, tok.line, tok.column);
+        }
+        return fn(...args);
+      };
+      return {
+        __module: 'math',
+        ceil: mathFunction('ceil', 1, 1, Math.ceil), floor: mathFunction('floor', 1, 1, Math.floor),
+        trunc: mathFunction('trunc', 1, 1, Math.trunc), sqrt: mathFunction('sqrt', 1, 1, Math.sqrt),
+        cbrt: mathFunction('cbrt', 1, 1, Math.cbrt), exp: mathFunction('exp', 1, 1, Math.exp),
+        log: mathFunction('log', 1, 2, (value, base = Math.E) => Math.log(value) / Math.log(base)),
+        log2: mathFunction('log2', 1, 1, Math.log2),
+        sin: mathFunction('sin', 1, 1, Math.sin), cos: mathFunction('cos', 1, 1, Math.cos),
+        tan: mathFunction('tan', 1, 1, Math.tan),
+        degrees: mathFunction('degrees', 1, 1, value => value * 180 / Math.PI),
+        radians: mathFunction('radians', 1, 1, value => value * Math.PI / 180),
+        factorial: mathFunction('factorial', 1, 1, value => {
+          if (!Number.isInteger(value) || value < 0 || value > 170) throw new CITError('math.factorial() needs an integer from 0 to 170.');
+          let result = 1; for (let i = 2; i <= value; i++) result *= i; return result;
+        }, [0]),
+        gcd: mathFunction('gcd', 2, 2, (a, b) => { a = Math.abs(a); b = Math.abs(b); while (b) [a, b] = [b, a % b]; return a; }, [0, 1]),
+        lcm: mathFunction('lcm', 2, 2, (a, b) => a && b ? Math.abs(a * b) / mathGcd(a, b) : 0, [0, 1]),
+        e: Math.E, pi: Math.PI, tau: Math.PI * 2, nan: NaN, inf: Infinity
+      };
+    }
+    if (spec === 'ui') {
+      const tags = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'title', 'header', 'p'];
+      const ui = { __module: 'ui' };
+      for (const tag of tags) ui[tag] = (...children) => ({ __ui: true, tag, children });
+      return ui;
+    }
     if (typeof options.resolveModule !== 'function') throw new CITError('Imports are not available in this environment.', tok.line, tok.column);
     let r;
     try { r = options.resolveModule(spec, currentDir); } catch (err) { throw new CITError(err.message, tok.line, tok.column); }
@@ -1315,7 +1686,7 @@ async function run(source, output = () => {}, input = async prompt => '', option
   /* ---- assignment ---- */
 
   // Works out what an assignment target refers to (evaluating its parts once) and returns get/set helpers.
-  async function resolveTarget(t, env) {
+  async function resolveTarget(t, env, visibility = null) {
     if (t.kind === 'variable') return { get: () => env.get(t.name, t.token), set: v => env.set(t.name, v, t.token) };
     if (t.kind === 'member') {
       if (t.optional) throw new CITError("A safe '?.' cannot be used on the left side of an assignment.", t.token.line, t.token.column);
@@ -1323,7 +1694,25 @@ async function run(source, output = () => {}, input = async prompt => '', option
       if (o === null || typeof o !== 'object' || Array.isArray(o) || o instanceof Map) {
         throw new CITError(`Cannot set '${t.name}' on a ${typeOf(o)}.`, t.token.line, t.token.column);
       }
-      return { get: () => (hasOwn(o, t.name) ? o[t.name] : null), set: v => { o[t.name] = v; } };
+      const currentAccess = FIELD_ACCESS.get(o)?.get(t.name);
+      if (currentAccess && !canAccessField(o, currentAccess, env)) {
+        throw new CITError(`Cannot access ${currentAccess.visibility} field '${t.name}' outside its class.`, t.token.line, t.token.column);
+      }
+      return { get: () => (hasOwn(o, t.name) ? o[t.name] : null), set: v => {
+        o[t.name] = v;
+        let frame = env;
+        while (frame && frame.instance !== o) frame = frame.parent;
+        let binding = frame && frame.values.get(t.name);
+        if (frame && !binding) binding = frame.define(t.name, v, true, typeOf(v), t.token);
+        if (binding) binding.value = v;
+        if (visibility) {
+          let fields = FIELD_ACCESS.get(o);
+          if (!fields) { fields = new Map(); FIELD_ACCESS.set(o, fields); }
+          const access = { visibility, owner: env.className || o.__class };
+          fields.set(t.name, access);
+          if (binding) binding.fieldAccess = access;
+        }
+      } };
     }
     const o = await ev(t.object, env);
     const key = await indexValue(t.index, env, o);
@@ -1342,7 +1731,7 @@ async function run(source, output = () => {}, input = async prompt => '', option
   async function assign(s, env) {
     const compound = s.op !== '=';
     const rhs = await ev(s.expr, env);
-    const target = await resolveTarget(s.target, env);
+    const target = await resolveTarget(s.target, env, s.visibility);
     target.set(compound ? binaryOp(s.op.slice(0, -1), target.get(), rhs, s.token) : rhs);
   }
 
@@ -1365,13 +1754,30 @@ async function run(source, output = () => {}, input = async prompt => '', option
       switch (s.kind) {
         case 'empty': case 'pass': break;
         case 'block': { const r = await exec(s.body, new Env(env)); if (r) return r; break; }
+        case 'with': {
+          const resource = await ev(s.resource, env), scope = new Env(env);
+          scope.define(s.name.value, resource, false, typeOf(resource), s.name);
+          let result, failure;
+          try { result = await exec(s.body, scope); } catch (err) { failure = err; }
+          try { if (resource && typeof resource.close === 'function') await resource.close(); } catch (err) { if (!failure) failure = err; }
+          if (failure) throw failure;
+          if (result) return result;
+          break;
+        }
         case 'declare': {
           const values = [];
           if (s.exprs) for (const x of s.exprs) values.push(await ev(x, env));
           s.names.forEach((n, i) => {
-            const v = s.exprs ? values[i] : null;       // empty variables start as null
-            if (v && v.kind === 'function' && !v.name && s.exprs[i].kind === 'lambda') v.name = n.value;   // let f = x => x  is called "f"
-            env.define(n.value, v, s.mutable, typeOf(v), n);
+            const valueIndex = s.broadcast ? 0 : i;
+            const v = s.exprs ? values[valueIndex] : null;       // empty variables start as null
+            if (v && v.kind === 'function' && !v.name && s.exprs[valueIndex].kind === 'lambda') v.name = n.value;   // let f = x => x  is called "f"
+            if (n.value === '_') return;
+            const temporal = s.temporal ? {
+              unit: s.temporal.unit,
+              expiresAt: s.temporal.unit === 's' ? startedAt + s.temporal.amount * 1000 : null,
+              expiresLine: s.temporal.unit === 'l' ? n.line + s.temporal.amount : null
+            } : null;
+            env.define(n.value, v, s.mutable, typeOf(v), n, temporal);
           });
           break;
         }
@@ -1386,8 +1792,30 @@ async function run(source, output = () => {}, input = async prompt => '', option
           break;
         case 'expr': await ev(s.expr, env); break;
         case 'function':
-          env.define(s.name, { kind: 'function', name: s.name, params: s.params, body: s.body, closure: env }, false, 'function', s.token);
+          {
+            let fn = { kind: 'function', name: s.name, params: s.params, body: s.body, uiTitle: s.uiTitle, closure: env };
+            for (const decorator of (s.decorators || []).reverse()) {
+              const target = await ev(decorator, env);
+              fn = await callValue(target, [{ name: null, value: fn }], env, 'decorator', s.token);
+              if (!fn || fn.kind !== 'function') throw new CITError(`Decorator for '${s.name}' must return a function.`, s.token.line, s.token.column);
+            }
+            env.define(s.name, fn, false, 'function', s.token);
+          }
           break;
+        case 'enum': {
+          const values = await ev(s.expr, env);
+          if (!Array.isArray(values)) throw new CITError('An enum needs a list of values.', s.token.line, s.token.column);
+          const members = {};
+          for (const value of values) {
+            if (typeof value !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(value)) {
+              throw new CITError('Enum values must be valid names written as strings.', s.token.line, s.token.column);
+            }
+            members[value] = value;
+          }
+          Object.freeze(members);
+          env.define(s.name, members, false, 'object', s.token);
+          break;
+        }
         case 'class': {
           let parent = null;
           if (s.parent) {
@@ -1451,7 +1879,7 @@ async function run(source, output = () => {}, input = async prompt => '', option
           for (let i = start; step > 0 ? i < end : i > end; i += step) {
             tick('Loop limit exceeded.');
             const loopEnv = new Env(env);
-            loopEnv.define(s.name, i, s.mutable, 'int', s.token);
+            if (s.name !== '_') loopEnv.define(s.name, i, s.mutable, 'int', s.token);
             const r = await exec(s.body, loopEnv);
             if (r?.type === BREAK) break;
             if (r?.type === CONTINUE) continue;
@@ -1462,13 +1890,13 @@ async function run(source, output = () => {}, input = async prompt => '', option
         case 'forin': {
           const source = await ev(s.iter, env);
           let items;
-          if (Array.isArray(source) || typeof source === 'string') items = [...source];     // a copy, so the loop is safe if the list changes
+          if (Array.isArray(source) || typeof source === 'string' || source instanceof Set) items = [...source];     // a copy, so the loop is safe if the list changes
           else if (source instanceof Map) items = [...source.keys()];                      // dictionaries loop over their keys
           else throw new CITError(`Cannot loop over a ${typeOf(source)}. Use a list, string or dictionary.`, s.token.line, s.token.column);
           for (const item of items) {
             tick('Loop limit exceeded.');
             const loopEnv = new Env(env);
-            loopEnv.define(s.name, item, s.mutable, typeOf(item), s.token);
+            if (s.name !== '_') loopEnv.define(s.name, item, s.mutable, typeOf(item), s.token);
             const r = await exec(s.body, loopEnv);
             if (r?.type === BREAK) break;
             if (r?.type === CONTINUE) continue;
@@ -1477,21 +1905,38 @@ async function run(source, output = () => {}, input = async prompt => '', option
           break;
         }
         case 'try': {
-          let r;
+          let r, failure = null;
           try { r = await exec(s.body, new Env(env)); }
           catch (err) {
-            if (!(err instanceof CITError) || err.fatal) throw err;           // only normal errors are caught
-            const catchEnv = new Env(env);
-            // err is the error message, or the exact value that was thrown (throw {code: 404})
-            if (s.name) { const ev0 = err.hasThrown ? err.thrown : err.message; catchEnv.define(s.name.value, ev0, false, typeOf(ev0), s.name); }
-            r = await exec(s.handler, catchEnv);
+            if (!(err instanceof CITError) || err.fatal) failure = err;
+            else {
+              const handler = s.handlers.find(item => item.errorType === err.errorType)
+                || s.handlers.find(item => !item.errorType);
+              if (!handler) failure = err;
+              else {
+                const catchEnv = new Env(env);
+                if (handler.name) {
+                  const caught = err.hasThrown ? err.thrown : err.message;
+                  catchEnv.define(handler.name.value, caught, false, typeOf(caught), handler.name);
+                }
+                try { r = await exec(handler.body, catchEnv); } catch (caught) { failure = caught; }
+              }
+            }
           }
+          if (s.finallyBody) {
+            try {
+              const finalResult = await exec(s.finallyBody, new Env(env));
+              if (finalResult) r = finalResult;
+            } catch (err) { failure = err; }
+          }
+          if (failure) throw failure;
           if (r) return r;
           break;
         }
         case 'throw': {
           const v = await ev(s.expr, env);
           const thrown = new CITError(format(v), s.token.line, s.token.column);
+          thrown.errorType = s.errorType || 'Error';
           thrown.hasThrown = true; thrown.thrown = v;
           throw thrown;
         }
@@ -1505,6 +1950,13 @@ async function run(source, output = () => {}, input = async prompt => '', option
         case 'import': {
           const mod = await loadModule(s.path, s.token);
           env.define(s.alias || defaultAlias(s.path), mod, false, 'module', s.token);
+          break;
+        }
+        case 'importMany': {
+          for (const name of s.names) {
+            const mod = await loadModule(name, s.token);
+            env.define(defaultAlias(name), mod, false, 'module', s.token);
+          }
           break;
         }
         case 'break': return { type: BREAK };

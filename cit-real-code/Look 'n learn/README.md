@@ -23,6 +23,11 @@ New to programming? Start at chapter 1 and read in order. Already know another l
 | 13 | [Modules and ipcit](13-modules-and-ipcit.md) | `import`, packages and the `ipcit` package manager |
 | 14 | [Tools and editor](14-tools-and-editor.md) | VS Code features, formatting, the `cit` command |
 | 15 | [Cheat sheet](15-cheat-sheet.md) | Everything on one page |
+| 16 | [Tuples, sets and math](16-collections-and-math.md) | Mixed collections, immutable tuples, sets and `math` |
+| 17 | [Functions and built-ins](17-functions-and-builtins.md) | Decorators, inline conditions and useful built-ins |
+| 18 | [UI and text files](18-ui-and-files.md) | HTML-style UI and UTF-8 file I/O |
+| 19 | [Temporal variables and errors](19-temporal-variables-and-errors.md) | Expiring variables, typed errors, `finally` and enums |
+| 20 | [CIT terminal and editor](20-terminal-and-editor.md) | CLI commands, hover and Go to Definition |
 
 ## Practice with the examples
 

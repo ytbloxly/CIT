@@ -15,6 +15,14 @@ These functions are always available. You do not import anything.
 | [`len`](#len) | length of text, a list or a dictionary |
 | [`random`](#random) | random decimal number |
 | [`randint`](#randint) | random whole number |
+| `printf` | formatted output |
+| `list` `tuple` `set` `dict` `frozendict` `frozenset` | collection constructors |
+| `zip` `enumerate` | pair items from iterables |
+| `type` `isinstance` `issubclass` | inspect types and classes |
+| `bin` `round` `id` `square` | utility functions |
+| `exchange` | assign a new value and return the old value |
+| `task.wait` | pause execution |
+| `open` | read or write UTF-8 text files |
 
 If you create your own variable or function with the same name, yours is used instead.
 

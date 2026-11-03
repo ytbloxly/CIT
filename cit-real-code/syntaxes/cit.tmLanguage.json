@@ -34,6 +34,9 @@
       "include": "#functionDeclarations"
     },
     {
+      "include": "#decorators"
+    },
+    {
       "include": "#functionKeyword"
     },
     {
@@ -199,6 +202,17 @@
         "1": {
           "name": "storage.type"
         },
+        "decorators": {
+          "match": "(@)([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "punctuation.definition.annotation"
+            },
+            "2": {
+              "name": "entity.name.function"
+            }
+          }
+        },
         "2": {
           "name": "entity.name.function"
         }
@@ -212,7 +226,7 @@
       "patterns": [
         {
           "name": "keyword.control",
-          "match": "\\b(if|elseif|else|while|do|switch|case|in|try|catch|throw|defer|for|range|return|break|continue|pass|import|as)\\b"
+          "match": "\\b(if|elseif|else|while|do|switch|case|in|try|catch|except|finally|throw|raise|defer|for|range|return|break|continue|pass|import|as|with|enum|private|protected)\\b"
         }
       ]
     },
@@ -222,7 +236,7 @@
     },
     "builtins": {
       "name": "support.function",
-      "match": "\\b(println|errorln|warnln|input|castInt|castFloat|castString|castBool|range|min|max|sum|len|random|randint)\\b(?=\\s*\\()"
+      "match": "\\b(println|printf|errorln|warnln|input|castInt|castFloat|castString|castBool|range|min|max|sum|len|random|randint|list|tuple|set|dict|frozendict|frozenset|object|bin|zip|enumerate|enumarate|round|id|type|isinstance|issubclass|square|exchange|open|sleep)\\b(?=\\s*\\()"
     },
     "self": {
       "name": "variable.language",
@@ -278,7 +292,7 @@
     },
     "listMethods": {
       "name": "support.function",
-      "match": "(?<=\\.)(append|pop|insert|clear|remove|reverse|count|index|copy|splice|unshift|shift|map|filter|reduce|slice|include|find|get|keys|values|update|items|popitem|default|fromkeys|ends|starts|substring|split|lower|upper|trim|replaceAll|replace|startPad|endPad|repeat|at|charAt|charCodeAt|indexOf|toFixed)\\b(?=\\s*\\()"
+      "match": "(?<=\\.)(append|pop|insert|clear|remove|reverse|count|index|copy|splice|unshift|shift|map|filter|reduce|slice|include|find|get|keys|values|update|items|popitem|default|fromkeys|ends|starts|substring|split|lower|upper|trim|replaceAll|replace|startPad|endPad|repeat|at|charAt|charCodeAt|indexOf|toFixed|ceil|floor|trunc|sqrt|cbrt|exp|log|log2|sin|cos|tan|degrees|radians|factorial|gcd|lcm|h1|h2|h3|h4|h5|h6|title|header|render|wait|write|read)\\b(?=\\s*\\()"
     },
     "caseDefault": {
       "match": "\\b(case)\\s+(default)\\b",

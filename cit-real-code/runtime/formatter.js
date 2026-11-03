@@ -19,9 +19,10 @@ const { tokenize } = require('./standalone');
 
 const NON_OPERAND_WORDS = new Set([
   'return', 'case', 'in', 'defer', 'throw', 'else', 'do', 'try', 'let', 'mut', 'import', 'as',
-  'if', 'elseif', 'while', 'for', 'switch', 'catch', 'fn', 'class'
+  'if', 'elseif', 'while', 'for', 'switch', 'catch', 'except', 'finally', 'raise', 'with',
+  'enum', 'private', 'protected', 'fn', 'class'
 ]);
-const CONTROL_BEFORE_PAREN = new Set(['if', 'elseif', 'while', 'for', 'switch', 'catch', 'return', 'case', 'in', 'defer', 'throw']);
+const CONTROL_BEFORE_PAREN = new Set(['if', 'elseif', 'while', 'for', 'switch', 'catch', 'except', 'return', 'case', 'in', 'defer', 'throw', 'raise']);
 const TWO_CHAR_OPS = ['==', '!=', '<=', '>=', '&&', '||', '**', '//', '+=', '-=', '*=', '/=', '%=', '++', '--', '=>'];
 
 class FormatError extends Error {}
@@ -90,7 +91,7 @@ function lexLine(line, mode) {
     if (two === '?.') { push('punc', '?.'); i += 2; continue; }
     if (TWO_CHAR_OPS.includes(two)) { push('op', two); i += 2; continue; }
     if ('+-*/%<>=!'.includes(ch)) { push('op', ch); i++; continue; }
-    if ('(){}[];,.:$'.includes(ch)) { push('punc', ch); i++; continue; }
+    if ('(){}[];,.:$@'.includes(ch)) { push('punc', ch); i++; continue; }
     push('op', ch); i++;       // anything else: keep as it is
   }
   return { toks, mode };
@@ -125,10 +126,12 @@ function classify(toks) {
 
 function needSpace(p, c) {
   if (p.type === 'bcomment' || c.type === 'bcomment') return true;
+  if (p.temporal && c.temporal) return false;
   if (isPunc(p, '(', '[')) return false;
   if (isPunc(c, ')', ']', ',', ';', '.', '?.', ':')) return false;
   if (isPunc(p, ',', ';', ':')) return true;
   if (isPunc(p, '.', '?.')) return false;
+  if (isPunc(p, '@') || isPunc(c, '@')) return false;
   if (isPunc(c, '{')) return true;
   if (isPunc(p, '{') && isPunc(c, '}')) return c.gap !== '';     // {} stays {} and { } stays { }
   if (isPunc(p, '{')) return p.kind === 'block' ? true : c.gap !== '';   // blocks get { x }; dictionaries keep {x} or { x }
@@ -153,6 +156,12 @@ function needSpace(p, c) {
 
 function renderTokens(toks) {
   classify(toks);
+  for (let i = 1; i + 3 < toks.length; i++) {
+    if (toks[i].text === '<' && /^\d+$/.test(toks[i + 1].text)
+      && ['s', 'l'].includes(toks[i + 2].text) && toks[i + 3].text === '>') {
+      for (let j = i; j <= i + 3; j++) toks[j].temporal = true;
+    }
+  }
   let out = '';
   let prev = null;
   for (const t of toks) {
@@ -177,7 +186,7 @@ function braceKind(prev) {
   if (!prev) return 'block';
   if (prev.type === 'op') return prev.text === '=>' ? 'block' : 'dict';
   if (isPunc(prev, ',', '(', '[', ':')) return 'dict';
-  if (prev.type === 'word' && (prev.text === 'return' || prev.text === 'throw' || prev.text === 'in')) return 'dict';
+  if (prev.type === 'word' && (prev.text === 'return' || prev.text === 'throw' || prev.text === 'raise' || prev.text === 'in' || prev.text === 'import')) return 'dict';
   return 'block';
 }
 

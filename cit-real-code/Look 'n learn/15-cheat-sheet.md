@@ -4,7 +4,7 @@ Everything in CIT on one page. Follow the chapter links for details.
 
 ## Words that have a special meaning
 
-`let` `mut` `fn` `class` `if` `elseif` `else` `switch` `case` `default` `while` `do` `for` `in` `range` `break` `continue` `pass` `return` `try` `catch` `throw` `defer` `import` `as` `true` `false` `null` `self` `super`
+`let` `mut` `fn` `class` `if` `elseif` `else` `switch` `case` `default` `while` `do` `for` `in` `range` `break` `continue` `pass` `return` `try` `catch` `except` `finally` `throw` `raise` `defer` `import` `as` `with` `enum` `private` `protected` `true` `false` `null` `self` `super`
 
 Types for typed variables: `int` `float` `str` `char` `bool`.
 
@@ -127,16 +127,39 @@ castInt(text, fallback = 0)
 | `random(a, b)` | random decimal |
 | `randint(a, b)` | random whole number |
 | `number.toFixed(n)` | rounded number |
+| `list()` `tuple()` `set()` `dict()` | construct a collection |
+| `frozendict()` `frozenset()` | construct a read-only collection |
+| `bin(n)` `square(n)` `round(n)` | binary text, square, rounded number |
+| `zip(...)` `enumerate(...)` | pair items from iterables |
+| `type(x)` `isinstance(x, "int")` `issubclass(a, b)` | inspect types and classes |
+| `printf(format, ...)` `exchange(variable, value)` | formatted print and swap value |
+| `task.wait(seconds)` | pause the program |
+
+## Additional features ([16–20](16-collections-and-math.md))
+
+```cit
+let mut values = {1, 2, 2, 3}
+let point = (1, "north")
+let mut recent <2s> = "short-lived"
+let mut rangeValue <30l> = 3
+let even = "Even" if (n % 2 == 0) else "Odd"
+import math
+println(math.sqrt(16), math.pi)
+```
+
+Classes also support `private` / `protected` fields and `@decorator` functions. `raise`, typed `except` clauses and `finally` are available. See chapters 16–20 for UI rendering, UTF-8 file I/O, enums and `cit --open trm`.
 
 ## Modules ([13](13-modules-and-ipcit.md))
 
 ```cit
 import "./lib/tools" as tools
 import "package-name"
+import math
+import { math, ui, ... }
 ```
 
 ## Removed
 
 `and`, `or`, `not` (use `&&`, `||`, `!`) and `for (let i, range = 0, 10)` (use `for (let i, range(0, 10))`).
 
-Previous: [14. Tools and editor](14-tools-and-editor.md) | Back to the [index](README.md)
+Previous: [14. Tools and editor](14-tools-and-editor.md) | Next: [16. Tuples, sets and math](16-collections-and-math.md) | Back to the [index](README.md)

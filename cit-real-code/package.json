@@ -1,8 +1,11 @@
 {
   "name": "cit-language",
   "displayName": "CIT - Code Information Technology",
-  "description": "CIT language support: dictionaries, lists, lambdas, inheritance, try/catch, defer, formatting, terminal input, colored errorln/warnln, the ipcit package manager, a bundled interpreter and the Look 'n learn guide.",
-  "version": "0.8.2",
+  "description": "CIT language support: collections, temporal variables, classes, math/UI modules, terminal tools, formatting and the Look 'n learn guide.",
+  "version": "0.8.3",
+  "scripts": {
+    "test": "node --test"
+  },
   "publisher": "cit-language",
   "engines": {
     "vscode": "^1.80.0"

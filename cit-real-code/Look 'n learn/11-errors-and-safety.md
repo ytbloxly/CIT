@@ -170,6 +170,27 @@ Result:
 [CIT Error] Line 1, column 1: Something bad happened
 ```
 
+### Typed errors and `finally`
+
+Use `raise` to identify an error type. An `except` handler catches only its named type; a general `catch` still handles any error. A `finally` block always runs:
+
+```cit
+try {
+    raise ValueError("Invalid input")
+} except ValueError as err {
+    println(err)
+} finally {
+    println("Cleanup")
+}
+```
+
+Output:
+
+```text
+Invalid input
+Cleanup
+```
+
 ### Nesting, rethrowing, and control flow
 
 ```cit

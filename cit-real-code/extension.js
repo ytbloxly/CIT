@@ -38,6 +38,34 @@ class CitTerminal {
         handleInput: data => this.handleInput(data)
       }
     });
+
+    const hoverProvider = vscode.languages.registerHoverProvider('cit', {
+      provideHover(document, position) {
+        const range = document.getWordRangeAtPosition(position);
+        if (!range) return null;
+        const word = document.getText(range);
+        const details = CIT_HOVER[ word ];
+        return details ? new vscode.Hover(new vscode.MarkdownString(details), range) : null;
+      }
+    });
+
+    const definitionProvider = vscode.languages.registerDefinitionProvider('cit', {
+      provideDefinition(document, position) {
+        const range = document.getWordRangeAtPosition(position);
+        if (!range) return null;
+        const name = document.getText(range);
+        const declaration = new RegExp(`(?:\\blet\\s+(?:mut\\s+|enum\\s+)?[^=\\r\\n]*\\b|\\b(?:fn|class)\\s+|\\b(?:int|float|str|char|bool)\\s+|\\bfor\\s*\\(\\s*(?:let\\s+(?:mut\\s+)?)?)(${escapeRegExp(name)})\\b`, 'g');
+        const source = document.getText();
+        const matches = [];
+        let match;
+        while ((match = declaration.exec(source))) matches.push(match.index + match[0].lastIndexOf(name));
+        if (!matches.length) return null;
+        const offset = document.offsetAt(position);
+        const preceding = matches.filter(index => index <= offset);
+        const target = preceding.length ? preceding[preceding.length - 1] : matches[0];
+        return new vscode.Location(document.uri, document.positionAt(target));
+      }
+    });
   }
 
   show() { this.terminal.show(true); }
@@ -153,11 +181,14 @@ function activate(context) {
       try {
         await executeBytecode(
           bytecode,
-          (line, kind) => term.writeLine(line, kind),   // kind: out | warn | error -> own color
+          (line, kind) => kind === 'print'
+            ? term.write(String(line).replace(/\r?\n/g, '\r\n'))
+            : term.writeLine(line, kind),   // kind: out | warn | error -> own color
           prompt => term.readLine(prompt),               // input() is typed in the terminal
           {
             baseDir: fsPath ? path.dirname(fsPath) : (vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? null),
             resolveModule: ipcit.resolveModule,
+            renderUI: (tree, title) => renderCITUI(tree, title),
             isCancelled: () => term.cancelled
           }
         );
@@ -225,9 +256,45 @@ function activate(context) {
     catch { await vscode.window.showTextDocument(uri); }
   });
 
-  context.subscriptions.push(runCmd, compileCmd, checkCmd, ipcitCmd, formatter, learnCmd, {
+  context.subscriptions.push(runCmd, compileCmd, checkCmd, ipcitCmd, formatter, hoverProvider, definitionProvider, learnCmd, {
     dispose: () => { if (runTerminal) runTerminal.close(); if (ipcitTerminal) ipcitTerminal.close(); }
   });
+}
+
+const CIT_HOVER = {
+  let: '`let` declares an immutable variable. Use `let mut` when it needs reassignment.',
+  mut: 'Marks a variable or loop binding as mutable.',
+  fn: 'Declares a function: `fn name(parameters) { ... }`.',
+  class: 'Declares a class. A parent can be written as `class Child(Parent())`.',
+  for: 'Loops support `for (let item in values)` and `for (let i, range(0, 10))`.',
+  import: 'Imports a local CIT module, an ipcit package, or built-in `math` / `ui` modules.',
+  temporal: 'Temporal variable lifetime suffixes are `<Ns>` (seconds) or `<Nl>` (source lines).',
+  tuple: 'Creates an immutable ordered tuple.',
+  set: 'Creates a unique-value set.',
+  printf: 'Prints a `%s`, `%d`, `%i`, `%f` formatted string.',
+  exchange: 'Replaces a mutable variable and returns its previous value.',
+  private: 'Restricts a class field to methods declared in that class.',
+  protected: 'Restricts a class field to methods in its class and subclasses.',
+  raise: 'Raises a typed error. Handle it with `except ErrorType` or a general `catch`.',
+  finally: 'Runs a cleanup block whether a `try` block succeeds or raises.'
+};
+
+function escapeRegExp(value) { return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+function renderCITUI(tree, title) {
+  const panel = vscode.window.createWebviewPanel('cit.preview', title || 'CIT App', vscode.ViewColumn.Beside, {
+    enableScripts: false,
+    localResourceRoots: []
+  });
+  const allowed = new Set(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'p', 'title']);
+  const escapeHTML = value => String(value).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
+  const render = value => {
+    if (Array.isArray(value)) return value.map(render).join('');
+    if (value && value.__ui && allowed.has(value.tag)) return `<${value.tag}>${value.children.map(render).join('')}</${value.tag}>`;
+    return escapeHTML(value === null || value === undefined ? '' : value);
+  };
+  panel.webview.html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><title>${escapeHTML(title || 'CIT App')}</title><style>body{font:16px/1.6 system-ui,sans-serif;max-width:760px;margin:48px auto;padding:0 24px;color:#24292f;background:#fff}h1,h2,h3,h4,h5,h6,header{line-height:1.2;color:#111827}p{margin:1em 0}</style></head><body>${render(tree)}</body></html>`;
+  return null;
 }
 
 function projectDir() {

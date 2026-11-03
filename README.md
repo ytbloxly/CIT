@@ -1,11 +1,11 @@
-<h1 align="center">CIT (Code Information Technology)</h1>
+<h1 align="center">CIT 1 Gen (Code Information Technology)</h1>
 
 <p align="center">
   A small, readable programming language with its own VS Code extension, a built-in interpreter and a package manager.
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-0.8.3-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-1.0.0-blue">
   <img alt="Files" src="https://img.shields.io/badge/files-.cit%20%7C%20.ct-informational">
   <img alt="Editor" src="https://img.shields.io/badge/editor-VS%20Code-007ACC">
 </p>
@@ -20,7 +20,7 @@
 
 ### What is CIT?
 
-CIT is a beginner-friendly programming language that gets out of your way. There is no `main` function, no boilerplate and no compiler to install: write a line, press Run, and it works. The VS Code extension bundles everything you need, including the interpreter, syntax highlighting, snippets and a terminal runner.
+CIT 1 Gen is a beginner-friendly programming language that gets out of your way. There is no `main` function, no boilerplate and no compiler to install: write a line, press Run, and it works. The VS Code extension bundles everything you need, including the interpreter, syntax highlighting, snippets, hover definitions, Go to Definition and a terminal runner.
 
 ### Hello, World! — CIT vs C++ vs Java
 
@@ -160,10 +160,13 @@ println(castInt("42"))
 - **Functions** with default and named arguments, stored in variables, **lambdas** (`x => x * x`, `x, y => return x * y`) and closures.
 - **Classes** with `fn struct(...)`, `self`, **inheritance** (`class builder(person())`) and `super()`.
 - **Collections**: heterogeneous lists, dictionaries, sets (`{1, 2, 2}`), immutable tuples (`(1, "two")`), plus `frozendict()` and `frozenset()`.
+- **CIT 1 language features**: destructuring, read/time/line-based temporal variables, `offline` and `stopUse` lifetimes, loop `else`, block-valued conditions, slicing, `guard`, static values, constants, final classes, property getters/setters, decorators, enums and typed errors.
 - **Math**: `import math` exposes rounding, roots, logarithms, trigonometry, factorial, gcd/lcm and constants (`pi`, `e`, `tau`, `nan`, `inf`).
-- **Temporal variables** (`let mut name <2s> = value` or `<30l>`), ternary expressions, decorators, enums and private/protected class fields.
+- **Modules and values**: `import name from module`, built-in `json` and `time` modules, fixed-width declarations (`i8`-`i64`, `f8`-`f64`, `s8`-`s64`, `b8`/`b16`), and `longString` / `longNumber`.
+- **Sets and tuples**: mutable set operations and immutable tuples, alongside constructors such as `list()`, `tuple()`, `set()`, `dict()`, `frozendict()` and `frozenset()`.
 - **Errors and files**: `raise`, typed `except`, `finally`, UTF-8 `open()` with write/append/read, and `printf`, `exchange`, `task.wait`, `zip`, `enumerate`, `type`, `round`, `id`, `isinstance`, `issubclass`, `bin`, `square`.
-- **Basic UI** with `import ui` and HTML-style elements rendered in a VS Code webview.
+- **UI** with `import ui` and HTML-style elements rendered in a VS Code webview, plus `ui-style` CSS-like styling.
+- **Editor support**: CIT syntax coloring, snippets, formatting, hover help and Go to Definition (`F12` / `Ctrl+Click`).
 - Comments with `#` and `/* ... */`, and modules with `import "name"` / `import "name" as alias`.
 - **Tools**: compile-before-run, **Format Document**, colored output, typed input in the terminal, snippets and the `ipcit` package manager.
 
@@ -179,6 +182,40 @@ nums.reverse()         # [2, 1, 3]
 println(nums.count(1), nums.index(3))   # 1 2
 let copy = nums.copy() # an independent copy
 nums.clear()           # []
+```
+
+### CIT 1 Gen highlights
+
+Temporal variables can expire by number of reads (`r`), seconds (`s`) or source lines (`l`):
+
+```cit
+let mut oneUse <1r> = "read once"
+let mut lineScoped <30l> = "expires after 30 source lines"
+let mut offlineValue <5s = offline> = "expires after five seconds without access"
+let mut inactiveValue <5s = stopUse> = "expires after five seconds of VS Code inactivity"
+```
+
+`stopUse` uses VS Code window activity and has no activity signal in the standalone CLI. `longNumber` uses JavaScript numeric precision; it does not represent arbitrary-precision integers. Fixed-width numeric and string declarations validate their documented storage limits.
+
+The class and UI systems include access-controlled fields, properties, inheritance, and a sanitized HTML-style preview:
+
+```cit
+class Account() {
+    protected let mut balance = 0
+    get fn credit() { return self.balance }
+    set fn credit(value) { if (value >= 0) { self.balance = value } }
+}
+
+import ui
+import ui-style
+fn app(ui.title = "My CIT app") {
+    style.connect("page")
+    return [ui.h1("Hello"), ui.p("Rendered in a VS Code webview")]
+}
+fn page(style.title = "page") {
+    return [body { backgroundColor = "#f4f4f4" }]
+}
+app().render()
 ```
 
 `pop()` takes the last item (or `pop(i)` for item `i`). `remove(x)` and `index(x)` stop with an error if `x` is not in the list. Without `mut`, a list can be read but not changed.
@@ -346,7 +383,7 @@ Good to know:
 
 1. Open VS Code and go to Extensions (`Ctrl+Shift+X`).
 2. Click the `...` menu and choose **Install from VSIX...**.
-3. Select `cit-language-0.8.3.vsix`.
+3. Select `cit-language-1.0.0.vsix`.
 4. Open any `.cit` or `.ct` file. VS Code selects CIT automatically.
 5. Run it with the Play button in the editor, the right-click menu, or `Ctrl+F5`.
 
@@ -410,7 +447,7 @@ println(mp.hello())
 
 ### ¿Qué es CIT?
 
-CIT es un lenguaje de programación pensado para ser fácil de leer y de aprender. No hay función `main`, ni código repetitivo, ni compilador que instalar: escribes una línea, pulsas Ejecutar y funciona. La extensión de VS Code incluye todo lo necesario: el intérprete, el resaltado de sintaxis, los fragmentos de código y un ejecutor en terminal.
+CIT 1 Gen es un lenguaje de programación pensado para ser fácil de leer y de aprender. No hay función `main`, ni código repetitivo, ni compilador que instalar: escribes una línea, pulsas Ejecutar y funciona. La extensión de VS Code incluye todo lo necesario: el intérprete, el resaltado de sintaxis, los fragmentos de código, definiciones al pasar el cursor, Go to Definition y un ejecutor en terminal.
 
 ### ¡Hola, mundo! — CIT vs C++ vs Java
 
@@ -550,10 +587,12 @@ println(castInt("42"))
 - **Funciones** con argumentos por defecto y con nombre, guardadas en variables, **lambdas** (`x => x * x`, `x, y => return x * y`) y closures.
 - **Clases** con `fn struct(...)`, `self`, **herencia** (`class builder(person())`), `super()` y campos privados/protegidos.
 - **Colecciones**: listas y diccionarios heterogéneos, conjuntos (`{1, 2, 2}`), tuplas inmutables (`(1, "dos")`), `frozendict()` y `frozenset()`.
+- **Funciones de CIT 1**: desempaquetado, variables temporales por lecturas/segundos/líneas, modos `offline` y `stopUse`, `for-else`, condiciones como valores, slicing, `guard`, valores estáticos, constantes, clases `final`, getters/setters, decoradores y enums.
 - **Matemáticas**: `import math` incluye redondeo, raíces, logaritmos, trigonometría, factorial, gcd/lcm y constantes (`pi`, `e`, `tau`, `nan`, `inf`).
-- **Variables temporales**, expresiones ternarias, decoradores, enums, `raise`, excepciones tipadas con `except` y bloques `finally`.
+- **Módulos y valores**: `import nombre from modulo`, módulos integrados `json` y `time`, declaraciones de ancho fijo (`i8`-`i64`, `f8`-`f64`, `s8`-`s64`, `b8`/`b16`), y `longString` / `longNumber`.
 - **Archivos y utilidades**: `open()` para leer/escribir UTF-8, `printf`, `exchange`, `task.wait`, `zip`, `enumerate`, `type`, `round`, `id`, `isinstance`, `issubclass`, `bin` y `square`.
-- **Interfaz básica** con `import ui` y elementos de estilo HTML renderizados en un webview de VS Code.
+- **Interfaz** con `import ui`, elementos HTML renderizados en un webview de VS Code y estilos CSS-like con `ui-style`.
+- **Editor**: resaltado de CIT, snippets, formateador, ayuda al pasar el cursor y Go to Definition (`F12` / `Ctrl+Click`).
 - Comentarios con `#` y `/* ... */`, y módulos con `import "nombre"` / `import "nombre" as alias`.
 - **Herramientas**: compilación antes de ejecutar, **Formatear documento**, salida en color, entrada escrita en la terminal, fragmentos de código (snippets) y el gestor de paquetes `ipcit`.
 
@@ -569,6 +608,40 @@ nums.reverse()         # [2, 1, 3]
 println(nums.count(1), nums.index(3))   # 1 2
 let copy = nums.copy() # una copia independiente
 nums.clear()           # []
+```
+
+### Funciones destacadas de CIT 1 Gen
+
+Las variables temporales admiten límites por lecturas (`r`), segundos (`s`) y líneas de código (`l`):
+
+```cit
+let mut oneUse <1r> = "se lee una vez"
+let mut lineScoped <30l> = "caduca tras 30 líneas de código"
+let mut offlineValue <5s = offline> = "caduca tras cinco segundos sin acceso"
+let mut inactiveValue <5s = stopUse> = "caduca tras cinco segundos de inactividad en VS Code"
+```
+
+`stopUse` utiliza la actividad de la ventana de VS Code; la CLI independiente no dispone de esa señal. `longNumber` usa la precisión numérica de JavaScript y no representa enteros de precisión arbitraria. Las declaraciones de ancho fijo validan sus límites de almacenamiento.
+
+Las clases admiten campos con acceso controlado, propiedades y herencia; la interfaz se muestra en una vista previa HTML segura:
+
+```cit
+class Account() {
+    protected let mut balance = 0
+    get fn credit() { return self.balance }
+    set fn credit(value) { if (value >= 0) { self.balance = value } }
+}
+
+import ui
+import ui-style
+fn app(ui.title = "Mi app CIT") {
+    style.connect("page")
+    return [ui.h1("Hola"), ui.p("Se muestra en un webview de VS Code")]
+}
+fn page(style.title = "page") {
+    return [body { backgroundColor = "#f4f4f4" }]
+}
+app().render()
 ```
 
 `pop()` quita el último elemento (o `pop(i)` el elemento `i`). `remove(x)` e `index(x)` se detienen con un error si `x` no está en la lista. Sin `mut`, una lista se puede leer pero no modificar.
@@ -736,7 +809,7 @@ Conviene saber:
 
 1. Abre VS Code y ve a Extensiones (`Ctrl+Shift+X`).
 2. Haz clic en el menú `...` y elige **Instalar desde VSIX...**.
-3. Selecciona `cit-language-0.8.3.vsix`.
+3. Selecciona `cit-language-1.0.0.vsix`.
 4. Abre cualquier archivo `.cit` o `.ct`. VS Code selecciona CIT automáticamente.
 5. Ejecútalo con el botón Play del editor, el menú contextual o `Ctrl+F5`.
 

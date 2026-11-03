@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-0.8.2-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-0.8.3-blue">
   <img alt="Files" src="https://img.shields.io/badge/files-.cit%20%7C%20.ct-informational">
   <img alt="Editor" src="https://img.shields.io/badge/editor-VS%20Code-007ACC">
 </p>
@@ -149,6 +149,7 @@ println(castInt("42"))
 
 - Inferred variables (`let`), mutable variables (`let mut`) and typed declarations (`int`, `float`, `str`, `char`, `bool`).
 - **Empty variables** (`let mut name`, then `name = "Coder"`) and **multiple assignment** (`let a, b, c = 2, 3, 4`).
+- A single value can initialize several variables at once: `let mut a, b, c = 2`.
 - **Math shortcuts**: `+=`, `-=`, `*=`, `/=`, `%=`, `**=`, `//=`, and `n++`, `++n`, `n--`, `--n`.
 - **Operators**: `+ - * / % // **`, `== != < > <= >=`, `&& || !`, and **`in`** for text, lists and dictionaries. (The words `and`, `or` and `not` were removed: use `&&`, `||` and `!`.)
 - **Control flow**: `if` / `elseif` / `else`, `while`, `do { ... } while (...)`, **`for (let i, range(0, 12))`** (with a step: `range(0, 12, 2)`), `for (let item in list)`, `switch` / `case`, plus `break`, `continue`, `pass` and `return`.
@@ -158,6 +159,11 @@ println(castInt("42"))
 - **Built-in functions**: `range()`, `min()`, `max()`, `sum()`, `len()` (lists, strings and dictionaries), `random()` and `randint()`.
 - **Functions** with default and named arguments, stored in variables, **lambdas** (`x => x * x`, `x, y => return x * y`) and closures.
 - **Classes** with `fn struct(...)`, `self`, **inheritance** (`class builder(person())`) and `super()`.
+- **Collections**: heterogeneous lists, dictionaries, sets (`{1, 2, 2}`), immutable tuples (`(1, "two")`), plus `frozendict()` and `frozenset()`.
+- **Math**: `import math` exposes rounding, roots, logarithms, trigonometry, factorial, gcd/lcm and constants (`pi`, `e`, `tau`, `nan`, `inf`).
+- **Temporal variables** (`let mut name <2s> = value` or `<30l>`), ternary expressions, decorators, enums and private/protected class fields.
+- **Errors and files**: `raise`, typed `except`, `finally`, UTF-8 `open()` with write/append/read, and `printf`, `exchange`, `task.wait`, `zip`, `enumerate`, `type`, `round`, `id`, `isinstance`, `issubclass`, `bin`, `square`.
+- **Basic UI** with `import ui` and HTML-style elements rendered in a VS Code webview.
 - Comments with `#` and `/* ... */`, and modules with `import "name"` / `import "name" as alias`.
 - **Tools**: compile-before-run, **Format Document**, colored output, typed input in the terminal, snippets and the `ipcit` package manager.
 
@@ -333,14 +339,14 @@ Good to know:
 
 ### Learn CIT
 
-- The **`Look 'n learn`** folder is a 15-chapter guide that explains every function and every part of the language, with examples you can run. In VS Code, run **CIT: Open Look 'n learn (Docs)** from the Command Palette.
+- The **`Look 'n learn`** folder is a 20-chapter guide that explains the language and new features, with examples you can run. In VS Code, run **CIT: Open Look 'n learn (Docs)** from the Command Palette.
 - The **`examples`** folder has one runnable program for each chapter, plus a guessing game and a mini project.
 
 ### Install the VS Code extension
 
 1. Open VS Code and go to Extensions (`Ctrl+Shift+X`).
 2. Click the `...` menu and choose **Install from VSIX...**.
-3. Select `cit-language-0.8.2.vsix`.
+3. Select `cit-language-0.8.3.vsix`.
 4. Open any `.cit` or `.ct` file. VS Code selects CIT automatically.
 5. Run it with the Play button in the editor, the right-click menu, or `Ctrl+F5`.
 
@@ -354,7 +360,9 @@ Run first **compiles** your file (typing mistakes are reported before anything r
 - `input("Prompt")` is typed directly in the terminal. Press Enter to submit.
 - `Ctrl+C` stops a running program.
 
-Use **Format Document** (`Shift+Alt+F`) to tidy your code. If you have Node.js installed, you can also run `cit file.cit` from any terminal opened inside VS Code.
+Use **Format Document** (`Shift+Alt+F`) to tidy your code. To use the CLI in Command Prompt or PowerShell, install Node.js and run `npm.cmd link` from the extension project folder. Use `cit file.cit` to run a program.
+
+The CLI also supports `cit --open trm` (interactive terminal), `cit --crt file --nm main.cit` (create), `cit --enter main.cit` (run), and `cit --dlt main.cit` (delete).
 
 ### ipcit — the CIT package manager
 
@@ -386,14 +394,14 @@ println(mp.hello())
 
 ```
 .
-├── extension.js        # VS Code extension (terminal runner, ipcit terminal)
+├── extension.js        # VS Code extension (terminal runner, UI preview, ipcit terminal)
 ├── runtime/            # Compiler/interpreter, formatter, ipcit and terminal colors
 ├── bin/                # cit and ipcit command-line tools
 ├── registry/           # ipcit package registry (packages will be added here)
 ├── syntaxes/           # Syntax highlighting
 ├── snippets/           # Code snippets
 ├── examples/           # One runnable .cit program per chapter (01-hello-world.cit ... 15-mini-project.cit)
-└── Look 'n learn/      # The guide: 15 chapters that explain the whole language
+└── Look 'n learn/      # The guide: 20 chapters that explain the whole language
 ```
 
 ---
@@ -531,6 +539,7 @@ println(castInt("42"))
 
 - Variables inferidas (`let`), variables mutables (`let mut`) y declaraciones con tipo (`int`, `float`, `str`, `char`, `bool`).
 - **Variables vacías** (`let mut name`, y luego `name = "Coder"`) y **asignación múltiple** (`let a, b, c = 2, 3, 4`).
+- Un valor también puede inicializar varias variables: `let mut a, b, c = 2`.
 - **Atajos matemáticos**: `+=`, `-=`, `*=`, `/=`, `%=`, `**=`, `//=`, y `n++`, `++n`, `n--`, `--n`.
 - **Operadores**: `+ - * / % // **`, `== != < > <= >=`, `&& || !` y **`in`** para texto, listas y diccionarios. (Las palabras `and`, `or` y `not` se eliminaron: usa `&&`, `||` y `!`.)
 - **Control de flujo**: `if` / `elseif` / `else`, `while`, `do { ... } while (...)`, **`for (let i, range(0, 12))`** (con paso: `range(0, 12, 2)`), `for (let item in list)`, `switch` / `case`, además de `break`, `continue`, `pass` y `return`.
@@ -539,7 +548,12 @@ println(castInt("42"))
 - **Listas** con 18 métodos (`map`, `filter`, `reduce`, `splice`...), **diccionarios** `{name: "Coder", age: 24}` con 11 métodos, y números con `toFixed`.
 - **Funciones integradas**: `range()`, `min()`, `max()`, `sum()`, `len()` (listas, cadenas y diccionarios), `random()` y `randint()`.
 - **Funciones** con argumentos por defecto y con nombre, guardadas en variables, **lambdas** (`x => x * x`, `x, y => return x * y`) y closures.
-- **Clases** con `fn struct(...)`, `self`, **herencia** (`class builder(person())`) y `super()`.
+- **Clases** con `fn struct(...)`, `self`, **herencia** (`class builder(person())`), `super()` y campos privados/protegidos.
+- **Colecciones**: listas y diccionarios heterogéneos, conjuntos (`{1, 2, 2}`), tuplas inmutables (`(1, "dos")`), `frozendict()` y `frozenset()`.
+- **Matemáticas**: `import math` incluye redondeo, raíces, logaritmos, trigonometría, factorial, gcd/lcm y constantes (`pi`, `e`, `tau`, `nan`, `inf`).
+- **Variables temporales**, expresiones ternarias, decoradores, enums, `raise`, excepciones tipadas con `except` y bloques `finally`.
+- **Archivos y utilidades**: `open()` para leer/escribir UTF-8, `printf`, `exchange`, `task.wait`, `zip`, `enumerate`, `type`, `round`, `id`, `isinstance`, `issubclass`, `bin` y `square`.
+- **Interfaz básica** con `import ui` y elementos de estilo HTML renderizados en un webview de VS Code.
 - Comentarios con `#` y `/* ... */`, y módulos con `import "nombre"` / `import "nombre" as alias`.
 - **Herramientas**: compilación antes de ejecutar, **Formatear documento**, salida en color, entrada escrita en la terminal, fragmentos de código (snippets) y el gestor de paquetes `ipcit`.
 
@@ -715,14 +729,14 @@ Conviene saber:
 
 ### Aprende CIT
 
-- La carpeta **`Look 'n learn`** es una guía de 15 capítulos que explica todas las funciones y todas las partes del lenguaje, con ejemplos que puedes ejecutar. En VS Code, ejecuta **CIT: Open Look 'n learn (Docs)** desde la paleta de comandos.
+- La carpeta **`Look 'n learn`** es una guía de 20 capítulos sobre el lenguaje y sus nuevas funciones, con ejemplos que puedes ejecutar. En VS Code, ejecuta **CIT: Open Look 'n learn (Docs)** desde la paleta de comandos.
 - La carpeta **`examples`** tiene un programa ejecutable por cada capítulo, además de un juego de adivinar el número y un miniproyecto.
 
 ### Instalar la extensión de VS Code
 
 1. Abre VS Code y ve a Extensiones (`Ctrl+Shift+X`).
 2. Haz clic en el menú `...` y elige **Instalar desde VSIX...**.
-3. Selecciona `cit-language-0.8.2.vsix`.
+3. Selecciona `cit-language-0.8.3.vsix`.
 4. Abre cualquier archivo `.cit` o `.ct`. VS Code selecciona CIT automáticamente.
 5. Ejecútalo con el botón Play del editor, el menú contextual o `Ctrl+F5`.
 
@@ -736,7 +750,9 @@ Al ejecutar, primero se **compila** el archivo (los errores de escritura se mues
 - `input("Mensaje")` se escribe directamente en la terminal. Pulsa Enter para enviar.
 - `Ctrl+C` detiene un programa en ejecución.
 
-Usa **Formatear documento** (`Shift+Alt+F`) para ordenar tu código. Si tienes Node.js instalado, también puedes ejecutar `cit archivo.cit` desde cualquier terminal abierta dentro de VS Code.
+Usa **Formatear documento** (`Shift+Alt+F`) para ordenar tu código. Para usar la CLI en Command Prompt o PowerShell, instala Node.js y ejecuta `npm.cmd link` desde la carpeta del proyecto.
+
+También puedes usar `cit --open trm` (terminal interactiva), `cit --crt file --nm main.cit` (crear), `cit --enter main.cit` (ejecutar) y `cit --dlt main.cit` (eliminar).
 
 ### ipcit — el gestor de paquetes de CIT
 
@@ -775,7 +791,7 @@ println(mp.hello())
 ├── syntaxes/           # Resaltado de sintaxis
 ├── snippets/           # Fragmentos de código
 ├── examples/           # Un programa .cit ejecutable por capítulo (01-hello-world.cit ... 15-mini-project.cit)
-└── Look 'n learn/      # La guía: 15 capítulos que explican todo el lenguaje
+└── Look 'n learn/      # La guía: 20 capítulos que explican todo el lenguaje
 ```
 
 <p align="center"><sub>Made with ♥ · Hecho con ♥</sub></p>

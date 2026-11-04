@@ -25,9 +25,10 @@ New to programming? Start at chapter 1 and read in order. Already know another l
 | 15 | [Cheat sheet](15-cheat-sheet.md) | Everything on one page |
 | 16 | [Tuples, sets and math](16-collections-and-math.md) | Mixed collections, immutable tuples, sets and `math` |
 | 17 | [Functions and built-ins](17-functions-and-builtins.md) | Decorators, inline conditions and useful built-ins |
-| 18 | [UI and text files](18-ui-and-files.md) | HTML-style UI and UTF-8 file I/O |
+| 18 | [Terminal tools and files](18-terminal-tools-and-files.md) | Terminal helpers and UTF-8 file I/O |
 | 19 | [Temporal variables and errors](19-temporal-variables-and-errors.md) | Expiring variables, typed errors, `finally` and enums |
 | 20 | [CIT terminal and editor](20-terminal-and-editor.md) | CLI commands, hover and Go to Definition |
+| 21 | [Update 1 features](21-update-1-features.md) | Async functions, variadics, generics, operators, reactive values and SQLite |
 
 ## Practice with the examples
 

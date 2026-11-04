@@ -1,4 +1,4 @@
-# CIT 1 Gen — Code Information Technology v1.0.0
+# CIT 1 Gen/Update 1 — Code Information Technology v1.0.1
 
 CIT is a small, readable programming language with its own VS Code extension, a built-in compiler and interpreter, a formatter and a package manager. Files end in `.cit` or `.ct`.
 
@@ -6,7 +6,7 @@ CIT is a small, readable programming language with its own VS Code extension, a 
 
 1. Open VS Code Extensions (`Ctrl+Shift+X`).
 2. Open the `...` menu and choose **Install from VSIX...**.
-3. Select `cit-language-1.0.0.vsix`.
+3. Select `cit-language-1.0.1.vsix`.
 4. Open a `.cit` or `.ct` file; VS Code automatically selects CIT.
 5. Run using the editor's Play icon, the context menu, or `Ctrl+F5`.
 
@@ -14,7 +14,7 @@ F5 is only needed when developing/debugging the extension itself.
 
 ## Learn CIT
 
-- **`Look 'n learn`** is a 20-chapter guide covering the language, collections, math, decorators, UI, files and CLI. Run **CIT: Open Look 'n learn (Docs)** from the Command Palette, or open `Look 'n learn/README.md`.
+- **`Look 'n learn`** is a 21-chapter guide covering the language, collections, math, decorators, terminal tools, files and CLI. Run **CIT: Open Look 'n learn (Docs)** from the Command Palette, or open `Look 'n learn/README.md`.
 - **`examples`** has one runnable program for each chapter (`01-hello-world.cit` to `15-mini-project.cit`), plus a guessing game.
 
 ## What the language has
@@ -27,10 +27,15 @@ F5 is only needed when developing/debugging the extension itself.
 - Functions with default and named arguments (`name: value` or `name = value`), lambdas (`x => x * x`), closures, function values, `defer`.
 - Classes with `fn struct(...)`, `self`, inheritance, `super()`, `private` / `protected` fields, getters/setters, and final classes; decorated functions and enums.
 - Errors: `try` / `catch` / typed `except` / `finally`, `raise`, safe navigation and conversion fallbacks.
-- Modules: `math`, `ui`, `ui-style`, `json`, and `time`; multiple/from imports, local/package imports and the `ipcit` package manager.
+- Modules: `math`, `json`, `time`, `datetime`, `cli`, `sys`, and `database`; multiple/from imports, local/package imports and the `ipcit` package manager.
+- `math` includes statistics; `json` supports parse/stringify/query/merge/validation and file I/O; `datetime` has date arithmetic, cron calculation and benchmarking.
+- `database.connect(path)` opens SQLite, with parameterized `db.run(sql, values)` and `db.all(sql, values)`. SQLite requires a Node.js runtime with `node:sqlite` (Node.js 22.5 or later).
 - Math and utility functions: `printf`, `exchange`, `task.wait`, `zip`, `enumerate`, `type`, `round`, `id`, `isinstance`, `issubclass`, `bin` and `square`.
-- Temporal variables expire after `<Nr>` reads, `<Ns>` seconds or `<Nl>` source lines. Seconds can use `offline` (time since last read) or `stopUse` (VS Code window inactivity).
-- UI elements and CSS-like style rules render in an HTML-style VS Code webview; `open(..., "write"/"append")` saves UTF-8 text files.
+- Temporal variables expire after `<Nr>` reads, `<Ns>` seconds or `<Nl>` source lines; two limits can be chained with `after`. Seconds can use `offline` (time since last read) or `stopUse` (VS Code window inactivity).
+- `cli` provides terminal menus (numeric selection), tables, confirmation, progress indicators, terminal controls and hidden password input in the VS Code runner. Standalone password input is disabled because standard input cannot guarantee hidden input. `open(..., "write"/"append")` saves UTF-8 text files.
+- Functions support `*args`/`**kwargs`, `async`/`await`, custom binary operators, generic type-argument syntax, null coalescing (`??`) and reactive `watch` blocks.
+- `sys` provides environment and machine information plus `sys.exit()` to stop only the current CIT program. VS Code provides clipboard read/write; the standalone CLI does not. `sys.isAdmin()` returns `null` where the runtime cannot reliably determine administrator status. `sys.exec`, `sys.run`, `sys.kill` and signal/raw-mode controls are not exposed.
+- The HTML-style UI and `window.prompt` / `window.alert` integrations were removed in Update 1; CIT programs run in the terminal.
 - `longString(value)` converts a value to text; ordinary strings have no size limit unless an `sN` width is declared. `longNumber` uses JavaScript numbers and does not provide arbitrary-precision integers.
 
 ## Running

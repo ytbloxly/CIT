@@ -17,6 +17,7 @@ let mut inactiveValue <5s = stopUse> = 30
 - `<5r>` expires after five reads.
 - `offline` restarts its timeout on each read and expires after that many seconds without use.
 - `stopUse` expires after that many seconds while the VS Code window is inactive. The standalone CLI does not currently have a window-activity signal, so this mode is only effective in VS Code.
+- Two limits can be chained, for example `let mut value <3s> after <30l> = 12`; the variable expires when either limit is reached.
 
 Reading or assigning an expired variable reports an error. Durations must be positive whole numbers. `offline` and `stopUse` are only valid with the seconds (`s`) unit.
 
@@ -53,4 +54,4 @@ printf("The color is %s", red)
 
 Fixed-width numeric and string declarations are range/size checked. Ordinary strings are unbounded unless an `sN` width is explicitly declared; `longString(value)` converts any value to text. `longNumber(value)` still uses a JavaScript number, so it cannot preserve arbitrary-precision integer values.
 
-Previous: [18. UI and text files](18-ui-and-files.md) | Next: [20. CIT terminal and editor](20-terminal-and-editor.md)
+Previous: [18. Terminal tools and text files](18-terminal-tools-and-files.md) | Next: [20. CIT terminal and editor](20-terminal-and-editor.md)

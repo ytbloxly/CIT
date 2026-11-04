@@ -52,7 +52,7 @@ A working example is in the `examples` folder: `14-modules.cit`.
 
 ### Built-in modules, named imports, and multiple imports
 
-The standard `math`, `ui`, `ui-style`, `json`, and `time` modules do not need to be installed:
+The standard `math`, `json`, `time`, `datetime`, `cli`, `sys`, and `database` modules do not need to be installed:
 
 ```cit
 import math
@@ -61,12 +61,14 @@ import pi from math
 println(pi)
 ```
 
+`cli` offers terminal interaction helpers and hidden password input in the VS Code runner. `sys` exposes system information, clipboard access in VS Code, and `sys.exit()` to end only the current CIT program; process execution and termination are deliberately unavailable. `database.connect(path)` opens a SQLite database (requires Node.js 22.5 or later).
+
 Import several packages or built-in modules in one statement:
 
 ```cit
 import {
     math,
-    ui,
+    cli,
     ...
 }
 ```
@@ -83,13 +85,22 @@ println(data["name"])
 ```
 
 `json.dump(value, file)` and `json.load(file)` write/read JSON through a file opened with `open(...)`.
+The module also provides `parse`, `stringify`, `read`, `write`, `query`, `minify`, `validate`, `colorize` and `merge`.
 
-The `time` module provides `time()`, `ctime()`, `perfCounter()`, `localtime()`, `gmtime()`, `asctime()`, `strftime()` and `strptime()`:
+The `time` module provides `time()`, `ctime()`, `perfCounter()`, `localtime()`, `gmtime()`, `asctime()`, `strftime()` and `strptime()`. `datetime` provides date arithmetic, formatting and benchmark helpers:
 
 ```cit
 import time
 println(time.strftime("%Y-%m-%d", time.localtime()))
 ```
+
+```cit
+import datetime
+let now = datetime.now()
+println(datetime.format(now, "%Y-%m-%d"))
+```
+
+`datetime.cron(expression, after)` returns the next matching time for a five-field cron expression. `database.connect(path)` opens SQLite; use `run(sql, values)` and `all(sql, values)` with bound parameter lists rather than interpolating values into SQL. SQLite needs Node.js 22.5 or later.
 
 ## Packages and `ipcit`
 

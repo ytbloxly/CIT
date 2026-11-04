@@ -53,7 +53,7 @@ async function runFile(file) {
     return 1;
   }
   try {
-    await executeBytecode(program,
+    const result = await executeBytecode(program,
       (line, kind) => {
         if (kind === 'print') process.stdout.write(line);
         else console.log(paint(kind, line, color));
@@ -61,7 +61,7 @@ async function runFile(file) {
       input,
       { baseDir: path.dirname(abs), resolveModule }
     );
-    return 0;
+    return result.exitCode || 0;
   } catch (err) {
     if (err instanceof CITError) console.error(paint('error', `[CIT Error] Line ${err.line}, column ${err.column}: ${err.message}`, color));
     else console.error(paint('error', `[CIT] ${err.stack || err}`, color));

@@ -335,22 +335,6 @@
     ],
     "description": "Import and use the built-in math module"
   },
-  "CIT UI App": {
-    "prefix": "uiapp",
-    "body": [
-      "import ui",
-      "",
-      "fn app(ui.title = \"${1:My App}\") {",
-      "\treturn [",
-      "\t\tui.h1(\"${2:Hello World!}\"),",
-      "\t\tui.p(\"${3:Paragraph text}\")",
-      "\t]",
-      "}",
-      "",
-      "app().render()"
-    ],
-    "description": "Render a basic HTML-style UI in a VS Code webview"
-  },
   "CIT File Write": {
     "prefix": "filewrite",
     "body": [
@@ -514,20 +498,64 @@
     ],
     "description": "Declare an integer with a fixed-width storage constraint"
   },
-  "CIT UI Style": {
-    "prefix": "uistyle",
+  "CIT CLI Select": {
+    "prefix": "cliselect",
     "body": [
-      "import ui-style",
-      "",
-      "fn ${1:myStyle}(style.title = \"${2:My Style}\") {",
-      "\treturn [",
-      "\t\tbody {",
-      "\t\t\tbackgroundColor = \"${3:#ffffff}\"",
-      "\t\t\ttextColor = \"${4:#222222}\"",
-      "\t\t}",
-      "\t]",
+      "import cli",
+      "let ${1:choice} = cli.select([${2:\"Start\", \"Settings\", \"Exit\"}])",
+      "println(${1:choice})"
+    ],
+    "description": "Prompt for a terminal menu choice"
+  },
+  "CIT Async Function": {
+    "prefix": "asyncfn",
+    "body": [
+      "async fn ${1:loadData}(${2}) {",
+      "\tawait task.wait(${3:1})",
+      "\treturn ${4:\"done\"}",
       "}"
     ],
-    "description": "Define a CSS-like style for a UI webview"
+    "description": "Declare an async function with an await expression"
+  },
+  "CIT Reactive Watch": {
+    "prefix": "watch",
+    "body": [
+      "reactive let mut ${1:score} = ${2:0}",
+      "watch ${1:score} {",
+      "\tprintln($\"${1:score} changed\")",
+      "}"
+    ],
+    "description": "Declare a reactive variable and watch its changes"
+  },
+  "CIT SQLite Query": {
+    "prefix": "sqlite",
+    "body": [
+      "import database",
+      "let mut ${1:db} = database.connect(\":memory:\")",
+      "${1:db}.run(\"CREATE TABLE ${2:items} (id INTEGER PRIMARY KEY, name TEXT)\")",
+      "${1:db}.run(\"INSERT INTO ${2:items} (name) VALUES (?)\", [${3:\"CIT\"}])",
+      "let ${4:rows} = ${1:db}.all(\"SELECT id, name FROM ${2:items}\")",
+      "println(${4:rows}[0].name)",
+      "${1:db}.close()"
+    ],
+    "description": "Use parameterized SQLite statements"
+  },
+  "CIT Variadic Function": {
+    "prefix": "fnvariadic",
+    "body": [
+      "fn ${1:collect}(*args, **kwargs) {",
+      "\treturn [args, kwargs]",
+      "}"
+    ],
+    "description": "Capture extra positional and named arguments"
+  },
+  "CIT Custom Operator": {
+    "prefix": "operator",
+    "body": [
+      "operator ${1|+, -, *, /|}(${2:other}) {",
+      "\treturn ${3:other}",
+      "}"
+    ],
+    "description": "Overload a binary operator inside a class"
   }
 }

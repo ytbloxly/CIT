@@ -5,7 +5,7 @@ const path = require('path');
 /*
  * CIT interpreter (tokenizer, parser, evaluator).
  *
- * CIT 1 adds temporal variables, sets/tuples, modules, errors, UI and additional built-ins.
+ * CIT 1 adds temporal variables, sets/tuples, modules, errors and additional built-ins.
  * The words and/or/not were removed: use && || !.
  */
 
@@ -16,7 +16,10 @@ class CITError extends Error {
     this.line = line;
     this.column = column;
   }
+}
 
+class CITExit extends Error {
+  constructor(code) { super(); this.code = code; }
 }
 
 const BREAK = Symbol('break'), CONTINUE = Symbol('continue'), RETURN = Symbol('return');
@@ -27,7 +30,7 @@ const LITERAL_TOKENS = ['string', 'char', 'template'];
 const ASSIGNABLE = ['variable', 'member', 'index', 'pattern'];
 const DEFER_KINDS = ['println', 'errorln', 'warnln', 'expr', 'assign', 'block', 'if', 'while', 'dowhile', 'for', 'forin', 'switch', 'try', 'throw', 'pass'];
 const PRECEDENCE = new Map(Object.entries({
-  '||': 1, '&&': 2, '|': 3, '^': 4, '&': 5, '==': 6, '!=': 6, '<': 7, '>': 7, '<=': 7, '>=': 7, in: 7,
+  '??': 0, '||': 1, '&&': 2, '|': 3, '^': 4, '&': 5, '==': 6, '!=': 6, '<': 7, '>': 7, '<=': 7, '>=': 7, in: 7,
   '+': 8, '-': 8, '*': 9, '/': 9, '//': 9, '%': 9, '**': 10
 }));
 const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
@@ -188,7 +191,6 @@ function tokenize(source) {
     if (/[A-Za-z_]/.test(ch)) {
       let v = '';
       while (/[A-Za-z0-9_]/.test(source[i] || '')) v += adv();
-      if (v === 'ui' && source.startsWith('-style', i)) { for (let j = 0; j < 6; j++) v += adv(); }
       add('identifier', v, l, c);
       continue;
     }
@@ -198,7 +200,7 @@ function tokenize(source) {
     if (['|=', '&=', '^='].includes(source.slice(i, i + 2))) { adv(); adv(); add('operator', source.slice(i - 2, i), l, c); continue; }
     if (three === '...') { adv(); adv(); adv(); add('punctuation', three, l, c); continue; }
     const two = source.slice(i, i + 2);
-    if (['==', '!=', '<=', '>=', '&&', '||', '**', '//', '+=', '-=', '*=', '/=', '%=', '++', '--', '=>'].includes(two)) {
+    if (['==', '!=', '<=', '>=', '&&', '||', '??', '**', '//', '+=', '-=', '*=', '/=', '%=', '++', '--', '=>'].includes(two)) {
       adv(); adv(); add('operator', two, l, c); continue;
     }
     if (two === '?.') { adv(); adv(); add('punctuation', '?.', l, c); continue; }
@@ -216,7 +218,7 @@ function tokenize(source) {
 /* ------------------------------------------------------------------ */
 
 class Parser {
-  constructor(tokens) { this.tokens = tokens; this.pos = 0; this.inArgs = false; }
+  constructor(tokens) { this.tokens = tokens; this.pos = 0; this.inArgs = false; this.asyncDepth = 0; this.genericNames = new Set(); }
   cur() { return this.tokens[this.pos]; }
   peek(n = 1) { return this.tokens[this.pos + n]; }
   // Text inside a string must never be mistaken for syntax, so literals are skipped here.
@@ -252,38 +254,37 @@ class Parser {
 
   condition() { this.consume('('); const c = this.expression(); this.consume(')'); return c; }
 
-  selectorAhead() {
-    const first = this.cur();
-    if (!(first.type === 'identifier' || first.type === 'operator' && first.value === '*')) return false;
-    if (['if', 'elseif', 'else', 'for', 'while', 'switch', 'return', 'throw', 'raise', 'class', 'fn'].includes(first.value)) return false;
-    for (let i = this.pos; i < this.tokens.length && this.tokens[i].line === first.line; i++) {
-      if (this.tokens[i].value === '{') return true;
-      if (['(', ')', '=', '=>'].includes(this.tokens[i].value)) return false;
-    }
-    return false;
-  }
-
-  selectorBlock() {
-    const token = this.cur();
-    let selector = '';
-    while (!this.check('{') && this.cur().type !== 'eof') selector += this.tokens[this.pos++].value;
-    return { kind: 'styleSelector', selector, body: this.block(), token };
-  }
-
   params() {
     this.consume('(');
     const params = [];
+    let sawArgs = false, sawKwargs = false;
     this.withArgs(() => {
       if (!this.check(')')) do {
+        let kind = 'normal';
+        if (this.match('**')) { kind = 'kwargs'; sawKwargs = true; }
+        else if (this.match('*')) { kind = 'args'; sawArgs = true; }
+        if ((sawKwargs && kind !== 'kwargs') || (sawArgs && kind === 'normal')) {
+          throw new CITError('Variadic parameters must be ordered as *args followed by **kwargs.', this.cur().line, this.cur().column);
+        }
         const p = this.ident('Expected parameter name.');
-        const name = ['ui', 'style'].includes(p.value) && this.match('.') ? `${p.value}.${this.ident(`Expected a title after ${p.value}.`).value}` : p.value;
+        const name = p.value;
         let def = null;
         if (this.match('=')) def = this.expression();
-        params.push({ name, default: def });
+        if (kind !== 'normal' && def !== null) throw new CITError('Variadic parameters cannot have default values.', p.line, p.column);
+        params.push({ name, default: def, kind });
       } while (this.match(','));
     });
     this.consume(')');
     return params;
+  }
+
+  genericParams() {
+    if (!this.match('<')) return [];
+    const names = [this.ident('Expected a generic type parameter name.').value];
+    while (this.match(',')) names.push(this.ident('Expected another generic type parameter name.').value);
+    this.consume('>', "Expected '>' after generic type parameters.");
+    if (new Set(names).size !== names.length) throw new CITError('Generic type parameter names must be unique.', this.cur().line, this.cur().column);
+    return names;
   }
 
   // let [mut] name                       (empty variable, needs mut)
@@ -323,6 +324,20 @@ class Parser {
       if (temporal.amount <= 0) throw new CITError('A temporal duration must be greater than 0.', duration.line, duration.column);
       if (temporal.mode && !['offline', 'stopUse'].includes(temporal.mode)) throw new CITError("Temporal modes must be 'offline' or 'stopUse'.", duration.line, duration.column);
       if (temporal.mode && temporal.unit !== 's') throw new CITError("Temporal modes 'offline' and 'stopUse' can only be used with seconds ('s').", duration.line, duration.column);
+      temporal.constraints = [{ amount: temporal.amount, unit: temporal.unit, mode: temporal.mode }];
+      if (this.match('after')) {
+        this.consume('<', "Expected '<' before the chained temporal duration.");
+        const nextDuration = this.cur();
+        if (nextDuration.type !== 'int' || !this.tokens[this.pos + 1] || !['s', 'l', 'r'].includes(this.tokens[this.pos + 1].value)) {
+          throw new CITError("Expected a temporal duration such as '<30l>'.", nextDuration.line, nextDuration.column);
+        }
+        this.pos++;
+        const constraint = { amount: nextDuration.value, unit: this.cur().value };
+        this.pos++;
+        this.consume('>', "Expected '>' after the chained temporal duration.");
+        if (constraint.amount <= 0) throw new CITError('A temporal duration must be greater than 0.', nextDuration.line, nextDuration.column);
+        temporal.constraints.push(constraint);
+      }
     }
     const first = names[0];
     const list = names.map(n => n.value).join(', ');
@@ -343,6 +358,16 @@ class Parser {
 
   statement() {
     if (this.match(';')) return { kind: 'empty' };
+    if (this.match('reactive')) {
+      const declaration = this.statement();
+      if (declaration.kind !== 'declare') throw new CITError("'reactive' must precede a variable declaration.", this.cur().line, this.cur().column);
+      declaration.reactive = true;
+      return declaration;
+    }
+    if (this.match('watch')) {
+      const name = this.ident("Expected a variable name after 'watch'.");
+      return { kind: 'watch', name, body: this.block() };
+    }
     if (this.match('static')) {
       if (!this.check('let')) throw new CITError("'static' must be followed by a variable declaration.", this.cur().line, this.cur().column);
       return { ...this.declaration(), isStatic: true };
@@ -419,10 +444,33 @@ class Parser {
 
     if (this.match('fn')) {
       const n = this.ident('Expected function name.');
+      const genericParams = this.genericParams();
+      if (genericParams.length) this.genericNames.add(n.value);
       const params = this.params();
-      const title = params.find(p => p.name === 'ui.title');
-      const styleTitle = params.find(p => p.name === 'style.title');
-      return { kind: 'function', name: n.value, params: params.filter(p => !['ui.title', 'style.title'].includes(p.name)), uiTitle: title?.default || null, styleTitle: styleTitle?.default || null, body: this.block(), token: n };
+      return { kind: 'function', name: n.value, params, genericParams, body: this.block(), token: n };
+    }
+
+    if (this.match('async')) {
+      this.consume('fn', "'async' must be followed by a function declaration.");
+      const n = this.ident('Expected function name.');
+      const genericParams = this.genericParams();
+      if (genericParams.length) this.genericNames.add(n.value);
+      const params = this.params();
+      this.asyncDepth++;
+      let body;
+      try { body = this.block(); } finally { this.asyncDepth--; }
+      return { kind: 'function', name: n.value, params, genericParams, body, token: n, isAsync: true };
+    }
+
+    if (this.match('operator')) {
+      const operator = this.cur();
+      if (operator.type !== 'operator' || !['+', '-', '*', '/', '%', '**', '==', '!=', '<', '>', '<=', '>='].includes(operator.value)) {
+        throw new CITError('Unsupported custom operator.', operator.line, operator.column);
+      }
+      this.pos++;
+      const params = this.params();
+      if (params.length !== 1 || params[0].kind !== 'normal') throw new CITError('A custom binary operator needs exactly one parameter.', operator.line, operator.column);
+      return { kind: 'operator', operator: operator.value, params, body: this.block(), token: operator };
     }
 
     if (this.check('get') || this.check('set')) {
@@ -592,7 +640,7 @@ class Parser {
         this.consume('}', "Expected '}' to close the import list.");
         return { kind: 'importMany', names, token: t };
       }
-      if (t.type !== 'string' && !(t.type === 'identifier' && ['math', 'ui', 'json', 'time', 'ui-style'].includes(t.value))) throw new CITError("Expected a package or file name after 'import'.", t.line, t.column);
+      if (t.type !== 'string' && !(t.type === 'identifier' && ['math', 'json', 'time', 'datetime', 'cli', 'sys', 'database'].includes(t.value))) throw new CITError("Expected a package or file name after 'import'.", t.line, t.column);
       this.pos++;
       let alias = null;
       if (this.match('as')) alias = this.ident("Expected a name after 'as'.").value;
@@ -606,8 +654,6 @@ class Parser {
     if (this.match('continue')) return { kind: 'continue' };
     if (this.match('pass')) return { kind: 'pass' };
     if (this.check('{')) return { kind: 'block', body: this.block() };
-
-    if (this.selectorAhead()) return { ...this.selectorBlock(), kind: 'styleRule' };
 
     if (this.cur().type === 'identifier' && ['println', 'errorln', 'warnln'].includes(this.cur().value)) {
       const kind = this.cur().value; this.pos++;
@@ -644,7 +690,10 @@ class Parser {
   binary(min) {
     let left;
     const t0 = this.cur();
-    if ((this.check('++') || this.check('--'))) {                // ++n  --n
+    if (this.match('await')) {
+      if (!this.asyncDepth) throw new CITError("'await' can only be used inside an async function.", t0.line, t0.column);
+      left = { kind: 'await', expr: this.binary(11), token: t0 };
+    } else if ((this.check('++') || this.check('--'))) {                // ++n  --n
       this.pos++;
       const target = this.postfix();
       if (!ASSIGNABLE.includes(target.kind)) throw new CITError(`'${t0.value}' needs a variable, property or list item.`, t0.line, t0.column);
@@ -680,6 +729,13 @@ class Parser {
   postfix() {
     let e = this.primary();
     for (;;) {
+      if (e.kind === 'variable' && this.genericNames.has(e.name) && this.match('<')) {
+        const typeArgs = [this.ident('Expected a generic type argument.').value];
+        while (this.match(',')) typeArgs.push(this.ident('Expected another generic type argument.').value);
+        this.consume('>', "Expected '>' after generic type arguments.");
+        e = { ...e, typeArgs };
+        continue;
+      }
       if (this.check('.') || this.check('?.')) {
         const optional = this.cur().value === '?.';
         this.pos++;
@@ -719,9 +775,6 @@ class Parser {
         });
         this.consume(')');
         e = { kind: 'call', callee: e, args };
-        if (e.callee.kind === 'member' && e.callee.object.kind === 'variable' && e.callee.object.name === 'ui' && this.check('{')) {
-          e.childrenBody = this.block();
-        }
         continue;
       }
       break;
@@ -804,7 +857,6 @@ class Parser {
     if (this.match('true')) return { kind: 'literal', value: true };
     if (this.match('false')) return { kind: 'literal', value: false };
     if (this.match('null')) return { kind: 'literal', value: null };
-    if (this.selectorAhead()) return this.selectorBlock();
     if (['int', 'float', 'string', 'char', 'template'].includes(t.type)) {
       this.pos++;
       return { kind: 'literal', value: t.value, litType: t.type, token: t };
@@ -1001,13 +1053,14 @@ class Env {
     if (binding.temporal) {
       const temporal = binding.temporal;
       const now = Date.now();
-      let expired = temporal.unit === 's'
-        ? temporal.mode === 'offline'
-          ? now - temporal.lastUsedAt >= temporal.amount * 1000
-          : temporal.mode === 'stopUse' ? false : now >= temporal.expiresAt
-        : temporal.unit === 'l'
-          ? (tok?.line || 1) > temporal.expiresLine
-          : temporal.remainingReads <= 0;
+      const constraints = temporal.constraints || [temporal];
+      let expired = constraints.some(constraint => constraint.unit === 's'
+        ? constraint.mode === 'offline'
+          ? now - temporal.lastUsedAt >= constraint.amount * 1000
+          : constraint.mode === 'stopUse' ? false : now >= constraint.expiresAt
+        : constraint.unit === 'l'
+          ? (tok?.line || 1) > constraint.expiresLine
+          : constraint.remainingReads <= 0);
       if (temporal.mode === 'stopUse' && typeof temporal.isIdle === 'function') {
         if (temporal.isIdle()) {
           temporal.idleSince ??= now;
@@ -1018,7 +1071,7 @@ class Env {
         e.values.delete(n);
         throw new CITError(`Temporal variable '${n}' has expired.`, tok?.line || 1, tok?.column || 1);
       }
-      if (temporal.unit === 'r') temporal.remainingReads--;
+      for (const constraint of constraints) if (constraint.unit === 'r') constraint.remainingReads--;
       if (temporal.mode === 'offline') temporal.lastUsedAt = now;
     }
     return binding.value;
@@ -1029,12 +1082,13 @@ class Env {
     this.values.set(n, b);
     return b;
   }
-  set(n, v, tok = { line: 1, column: 1 }) {
+  async set(n, v, tok = { line: 1, column: 1 }) {
     const e = this.find(n);
     if (!e) throw new CITError(`Undefined variable '${n}'.`, tok.line, tok.column);
     this.get(n, tok);
     const x = e.values.get(n);
     if (!x.mutable) throw new CITError(`Cannot reassign immutable variable '${n}'. Use 'let mut'.`, tok.line, tok.column);
+    const previous = x.value;
     if (x.type === 'null') {
       x.type = typeOf(v);                       // an empty variable takes the type of its first value
     } else if (v === null && x.type === 'object') {
@@ -1046,6 +1100,9 @@ class Env {
     }
     if (x.width) v = castWidth(v, x.width, tok);
     x.value = v;
+    if (x.watchers?.length && !valuesEqual(previous, v)) {
+      for (const watcher of [...x.watchers]) await watcher(v, previous);
+    }
   }
 }
 
@@ -1365,28 +1422,6 @@ async function run(source, output = () => {}, input = async prompt => '', option
   const moduleCache = new Map(), loading = new Set();
   const SHORT = Symbol('short-circuit');      // result of a ?. chain that hit null
   const startedAt = Date.now();
-  const styleDefinitions = new Map();
-  let activeStyleName = null;
-  let collectingStyles = null;
-  const styleModule = {
-    __module: 'ui-style',
-    connect(name) {
-      if (typeof name !== 'string' || !styleDefinitions.has(name)) throw new CITError(`No style named '${name}' is defined.`);
-      activeStyleName = name;
-      return null;
-    }
-  };
-  global.define('window', {
-    prompt: async message => {
-      if (typeof options.windowPrompt === 'function') return options.windowPrompt(String(message ?? ''));
-      return input(String(message ?? ''));
-    },
-    alert: async message => {
-      if (typeof options.windowAlert === 'function') await options.windowAlert(String(message ?? ''));
-      else emit('println', message ?? '');
-      return null;
-    }
-  }, false, 'module');
   global.define('task', { wait: seconds => {
     if (typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds < 0) throw new CITError('task.wait() needs a non-negative number of seconds.');
     return new Promise(resolve => setTimeout(resolve, seconds * 1000));
@@ -1420,7 +1455,6 @@ async function run(source, output = () => {}, input = async prompt => '', option
         for (const en of e.entries) d.set(dictKey(await ev(en.key, env), en.key.token), await ev(en.value, env));
         return d;
       }
-      case 'styleSelector': return evaluateStyleSelector(e, env);
       case 'pattern': return e;
       case 'lambda': {
         const fn = { kind: 'function', name: e.name, params: e.params, body: e.body, closure: env };
@@ -1457,6 +1491,7 @@ async function run(source, output = () => {}, input = async prompt => '', option
         return readMember(o, e, env);
       }
       case 'update': return update(e, env);
+      case 'await': return ev(e.expr, env);
       case 'unary': {
         const v = await ev(e.expr, env);
         if (e.op === '!') return !truthy(v);
@@ -1468,7 +1503,10 @@ async function run(source, output = () => {}, input = async prompt => '', option
         const a = await ev(e.left, env);
         if (e.op === '&&') return truthy(a) && truthy(await ev(e.right, env));
         if (e.op === '||') return truthy(a) || truthy(await ev(e.right, env));
-        return binaryOp(e.op, a, await ev(e.right, env), e.token);
+        if (e.op === '??') return a === null || a === undefined ? ev(e.right, env) : a;
+        const b = await ev(e.right, env);
+        if (typeof a?.__operators?.[e.op] === 'function') return await a.__operators[e.op](b);
+        return binaryOp(e.op, a, b, e.token);
       }
       case 'oneOf': {
         const subject = await ev(e.subject, env);
@@ -1497,29 +1535,6 @@ async function run(source, output = () => {}, input = async prompt => '', option
       }
     }
     return value;
-  }
-
-  async function evaluateStyleSelector(node, env) {
-    if (!collectingStyles) throw new CITError('Style selectors can only be used while rendering a connected style.');
-    const properties = {};
-    for (const statement of node.body) {
-      if (statement.kind !== 'assign' || statement.target.kind !== 'variable' || statement.op !== '=') {
-        throw new CITError('Style blocks only support property assignments.', node.token.line, node.token.column);
-      }
-      properties[statement.target.name.replace(/^\$/, '')] = await ev(statement.expr, env);
-    }
-    const rule = { selector: node.selector, properties };
-    collectingStyles.push(rule);
-    return rule;
-  }
-
-  async function evalUIChildren(body, env) {
-    const children = [];
-    for (const statement of body) {
-      if (statement.kind === 'expr') children.push(await ev(statement.expr, env));
-      else await exec([statement], env);
-    }
-    return children.flat().filter(value => value !== null && value !== undefined);
   }
 
   // value in text / list / dictionary
@@ -1688,30 +1703,30 @@ async function run(source, output = () => {}, input = async prompt => '', option
       if (obj === SHORT) return SHORT;
       const tok = callee.token || { line: 1, column: 1 };
       if (callee.optional && (obj === null || obj === undefined)) return SHORT;     // p?.talk()
-      if (obj?.__module === 'ui') {
-        const attrs = {}, children = [];
-        for (const arg of e.args) {
-          const value = await ev(arg.value, env);
-          if (arg.name) attrs[arg.name] = value;
-          else children.push(value);
-        }
-        if (e.childrenBody) children.push(...await evalUIChildren(e.childrenBody, env));
-        if (!['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'title', 'header', 'p', 'button', 'slider', 'div', 'select', 'option', 'tile', 'input'].includes(callee.name)) {
-          throw new CITError(`ui has no element '${callee.name}'.`, tok.line, tok.column);
-        }
-        return { __ui: true, tag: callee.name, attrs, children };
+      if (obj?.__module === 'datetime' && callee.name === 'benchmark') {
+        if (e.args.length !== 1) throw new CITError('datetime.benchmark() needs one function.', tok.line, tok.column);
+        const callback = await ev(e.args[0].value, env);
+        if (!(callback && callback.kind === 'function') && typeof callback !== 'function') throw new CITError('datetime.benchmark() needs a function.', tok.line, tok.column);
+        const start = process.hrtime.bigint();
+        const result = await callValue(callback, [], env, 'callback', tok);
+        return { result, durationMs: Number(process.hrtime.bigint() - start) / 1e6 };
       }
-      if (obj?.__module === 'json' && ['dumps', 'dump'].includes(callee.name)) {
+      if (obj?.__module === 'json' && ['dumps', 'dump', 'stringify'].includes(callee.name)) {
         const values = [];
-        const named = {};
+        const named = Object.create(null);
         for (const arg of e.args) {
           const value = await ev(arg.value, env);
-          if (arg.name) named[arg.name] = value;
+          if (arg.name) {
+            if (hasOwn(named, arg.name)) throw new CITError(`JSON option '${arg.name}' was supplied more than once.`, tok.line, tok.column);
+            named[arg.name] = value;
+          }
           else values.push(value);
         }
         const dump = callee.name === 'dump';
         const wanted = dump ? 2 : 1;
         if (values.length !== wanted) throw new CITError(`json.${callee.name}() needs ${wanted} positional value${wanted === 1 ? '' : 's'}.`, tok.line, tok.column);
+        const unknownOption = Object.keys(named).find(option => !['indent', 'sortKeys'].includes(option));
+        if (unknownOption) throw new CITError(`json.${callee.name}() has no option '${unknownOption}'.`, tok.line, tok.column);
         const indent = named.indent === undefined ? 0 : named.indent;
         if (!Number.isInteger(indent) || indent < 0 || indent > 10) throw new CITError('JSON indent must be an integer from 0 to 10.', tok.line, tok.column);
         if (named.sortKeys !== undefined && typeof named.sortKeys !== 'boolean') throw new CITError('JSON sortKeys must be a boolean.', tok.line, tok.column);
@@ -1727,23 +1742,6 @@ async function run(source, output = () => {}, input = async prompt => '', option
           return null;
         }
         return value;
-      }
-      if (Array.isArray(obj) && callee.name === 'render' && obj.some(item => item && item.__ui)) {
-        let styles = [];
-        if (activeStyleName) {
-          const styleFn = styleDefinitions.get(activeStyleName);
-          if (!styleFn) throw new CITError(`No style named '${activeStyleName}' is defined.`, tok.line, tok.column);
-          collectingStyles = [];
-          try { await invoke(styleFn, [], env); styles = collectingStyles; } finally { collectingStyles = null; }
-        }
-        if (typeof options.renderUI === 'function') return options.renderUI(obj, obj.__uiTitle || 'CIT App', styles);
-        const renderText = value => {
-          if (Array.isArray(value)) return value.map(renderText).filter(Boolean).join('\n');
-          if (value && value.__ui) return value.children.map(renderText).filter(Boolean).join('\n');
-          return value === null || value === undefined ? '' : format(value);
-        };
-        emit('println', [obj.__uiTitle, renderText(obj)].filter(Boolean).join('\n'));
-        return null;
       }
       if (Array.isArray(obj) && obj[TUPLE]) return invokeMethod(obj, 'tuple', 'Tuples', TUPLE_METHODS, e, env);
       if (Array.isArray(obj)) return invokeMethod(obj, 'list', 'Lists', LIST_METHODS, e, env);
@@ -1766,7 +1764,7 @@ async function run(source, output = () => {}, input = async prompt => '', option
       if (callee.name === 'exchange' && e.args.length === 2) {
         const target = await resolveTarget(e.args[0].value, env);
         const previous = target.get(), replacement = await ev(e.args[1].value, env);
-        target.set(replacement);
+        await target.set(replacement);
         return previous;
       }
       if (callee.name === 'isinstance' && e.args.length === 2 && !env.find('isinstance')) {
@@ -2068,21 +2066,38 @@ async function run(source, output = () => {}, input = async prompt => '', option
     local.defers = [];
     local.functionId = fn.staticId || fn.name || 'anonymous';
     local.accessorName = fn.accessor ? fn.name : null;
+    const positional = args.filter(argument => !argument.name);
+    const named = new Map();
+    for (const argument of args) {
+      if (!argument.name) continue;
+      if (named.has(argument.name)) throw new CITError(`Argument '${argument.name}' was supplied more than once.`);
+      named.set(argument.name, argument.value);
+    }
     let pos = 0;
+    const usedNames = new Set();
     for (const p of fn.params) {
-      const named = args.find(a => a.name === p.name);
       let v;
-      if (named) v = named.value;
-      else if (pos < args.length && !args[pos].name) v = args[pos++].value;
+      if (p.kind === 'args') {
+        v = positional.slice(pos).map(argument => argument.value);
+        pos = positional.length;
+      } else if (p.kind === 'kwargs') {
+        v = new Map([...named].filter(([key]) => !usedNames.has(key)));
+        for (const key of v.keys()) usedNames.add(key);
+      } else if (named.has(p.name)) {
+        if (pos < positional.length) throw new CITError(`Argument '${p.name}' was supplied by both position and name.`);
+        v = named.get(p.name);
+        usedNames.add(p.name);
+      } else if (pos < positional.length) v = positional[pos++].value;
       else if (p.default !== null) v = await ev(p.default, local);
       else throw new CITError(`Missing argument '${p.name}'.`);
       local.define(p.name, v, false).param = true;   // parameters can't be reassigned, but a list passed in can be changed
     }
+    if (pos < positional.length) throw new CITError(`Too many positional arguments: expected ${fn.params.filter(parameter => parameter.kind === 'normal').length}, received ${positional.length}.`);
+    const unknown = [...named.keys()].find(key => !usedNames.has(key) && !fn.params.some(parameter => parameter.name === key));
+    if (unknown) throw new CITError(`Unexpected named argument '${unknown}'.`);
     return withDefers(local, async () => {
       const r = await exec(fn.body, local);
-      const value = r && r.type === RETURN ? r.value : null;
-      if (fn.uiTitle && Array.isArray(value)) Object.defineProperty(value, '__uiTitle', { value: format(await ev(fn.uiTitle, local)) });
-      return value;
+      return r && r.type === RETURN ? r.value : null;
     });
   }
 
@@ -2110,7 +2125,7 @@ async function run(source, output = () => {}, input = async prompt => '', option
     instanceEnv.instance = instance;
     instanceEnv.define('self', instance, false);
 
-    const tables = [];
+    const tables = [], operatorTables = [];
     const getterFns = {}, setterFns = {};
     let structFn = null, structEnv = null;
     for (const [i, c] of chain.entries()) {
@@ -2126,6 +2141,9 @@ async function run(source, output = () => {}, input = async prompt => '', option
         if (n === 'struct') { structFn = m; structEnv = levelEnv; }
       }
       tables.push(table);
+      operatorTables.push(Object.fromEntries(Object.entries(c.operators || {}).map(([operator, handler]) => [
+        operator, async value => invoke(handler, [{ name: null, value }], levelEnv)
+      ])));
       for (const [name, getter] of Object.entries(c.getters)) getterFns[name] = async () => invoke(getter, [], levelEnv);
       for (const [name, setter] of Object.entries(c.setters)) setterFns[name] = async value => invoke(setter, [{ name: null, value }], levelEnv);
       for (const [name, field] of Object.entries(c.fields)) {
@@ -2142,9 +2160,11 @@ async function run(source, output = () => {}, input = async prompt => '', option
       }
     }
     const merged = upto => Object.assign({}, ...tables.slice(0, upto + 1));
+    const mergedOperators = Object.assign({}, ...operatorTables);
     const parentView = i => Object.assign(merged(i), { __class: chain[i].name });
 
     Object.assign(instance, merged(chain.length - 1));
+    Object.defineProperty(instance, '__operators', { value: mergedOperators });
     Object.defineProperty(instance, '__getters', { value: getterFns });
     Object.defineProperty(instance, '__setters', { value: setterFns });
     if (structFn) await invoke(structFn, args, structEnv);
@@ -2155,7 +2175,6 @@ async function run(source, output = () => {}, input = async prompt => '', option
 
   function defaultAlias(spec) {
     let a = String(spec).split(/[\\/]/).filter(Boolean).pop() || 'module';
-    if (a === 'ui-style') return 'style';
     a = a.replace(/\.(cit|ct)$/, '').replace(/[^A-Za-z0-9_]/g, '_');
     return /^[0-9]/.test(a) ? '_' + a : a;
   }
@@ -2171,6 +2190,14 @@ async function run(source, output = () => {}, input = async prompt => '', option
           throw new CITError(`math.${name}() needs ${requirement}.`, tok.line, tok.column);
         }
         return fn(...args);
+      };
+      const listFunction = (name, fn) => (...args) => {
+        if (args.length !== 1) throw new CITError(`math.${name}() takes 1 list but got ${args.length} arguments.`, tok.line, tok.column);
+        const [values] = args;
+        if (!Array.isArray(values) || !values.length || !values.every(value => typeof value === 'number')) {
+          throw new CITError(`math.${name}() needs a non-empty list of numbers.`, tok.line, tok.column);
+        }
+        return fn(values);
       };
       return {
         __module: 'math',
@@ -2189,19 +2216,42 @@ async function run(source, output = () => {}, input = async prompt => '', option
         }, [0]),
         gcd: mathFunction('gcd', 2, 2, (a, b) => { a = Math.abs(a); b = Math.abs(b); while (b) [a, b] = [b, a % b]; return a; }, [0, 1]),
         lcm: mathFunction('lcm', 2, 2, (a, b) => a && b ? Math.abs(a * b) / mathGcd(a, b) : 0, [0, 1]),
+        mean: listFunction('mean', values => {
+          return values.reduce((total, value) => total + value, 0) / values.length;
+        }),
+        median: listFunction('median', values => {
+          const sorted = [...values].sort((a, b) => a - b);
+          const middle = Math.floor(sorted.length / 2);
+          return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+        }),
+        mode: listFunction('mode', values => {
+          const counts = new Map();
+          for (const value of values) counts.set(value, (counts.get(value) || 0) + 1);
+          let selected = values[0], count = 0;
+          for (const [value, occurrences] of counts) if (occurrences > count) { selected = value; count = occurrences; }
+          return selected;
+        }),
+        stddev: listFunction('stddev', values => {
+          const average = values.reduce((total, value) => total + value, 0) / values.length;
+          return Math.sqrt(values.reduce((total, value) => total + (value - average) ** 2, 0) / values.length);
+        }),
+        dist: (...args) => {
+          if (args.length !== 2) throw new CITError(`math.dist() takes 2 lists but got ${args.length} arguments.`, tok.line, tok.column);
+          const [left, right] = args;
+          if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length || !left.every(value => typeof value === 'number') || !right.every(value => typeof value === 'number')) {
+            throw new CITError('math.dist() needs equal-length lists of numbers.', tok.line, tok.column);
+          }
+          let distance = 0;
+          for (let index = 0; index < left.length; index++) distance = Math.hypot(distance, left[index] - right[index]);
+          return distance;
+        },
         e: Math.E, pi: Math.PI, tau: Math.PI * 2, nan: NaN, inf: Infinity
       };
     }
-    if (spec === 'ui') {
-      const tags = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'title', 'header', 'p', 'button', 'slider', 'div', 'select', 'option', 'tile', 'input'];
-      const ui = { __module: 'ui' };
-      for (const tag of tags) ui[tag] = (...children) => ({ __ui: true, tag, children });
-      return ui;
-    }
-    if (spec === 'ui-style') return styleModule;
     if (spec === 'json') return {
       __module: 'json',
       dumps: value => JSON.stringify(toJsonValue(value)),
+      stringify: value => JSON.stringify(toJsonValue(value)),
       dump: (value, file) => {
         if (!file || typeof file.write !== 'function') throw new CITError('json.dump(value, file) needs a writable file.');
         file.write(JSON.stringify(toJsonValue(value)));
@@ -2214,6 +2264,56 @@ async function run(source, output = () => {}, input = async prompt => '', option
       load: file => {
         if (!file || typeof file.read !== 'function') throw new CITError('json.load(file) needs a readable file.');
         try { return fromJsonValue(JSON.parse(file.read())); } catch (cause) { throw new CITError(`json.load(): ${cause.message}`, tok.line, tok.column); }
+      },
+      parse: text => {
+        if (typeof text !== 'string') throw new CITError('json.parse() needs a string.');
+        try { return fromJsonValue(JSON.parse(text)); } catch (cause) { throw new CITError(`json.parse(): ${cause.message}`, tok.line, tok.column); }
+      },
+      read: filename => {
+        if (typeof filename !== 'string') throw new CITError('json.read() needs a file name.');
+        try { return fromJsonValue(JSON.parse(fs.readFileSync(path.resolve(currentDir || process.cwd(), filename), 'utf8'))); }
+        catch (cause) { throw new CITError(`json.read(): ${cause.message}`, tok.line, tok.column); }
+      },
+      write: (filename, value) => {
+        if (typeof filename !== 'string') throw new CITError('json.write() needs a file name.');
+        try { fs.writeFileSync(path.resolve(currentDir || process.cwd(), filename), JSON.stringify(toJsonValue(value), null, 2), 'utf8'); }
+        catch (cause) { throw new CITError(`json.write(): ${cause.message}`, tok.line, tok.column); }
+        return null;
+      },
+      minify: text => {
+        if (typeof text !== 'string') throw new CITError('json.minify() needs JSON text.');
+        try { return JSON.stringify(JSON.parse(text)); } catch (cause) { throw new CITError(`json.minify(): ${cause.message}`, tok.line, tok.column); }
+      },
+      validate: text => {
+        if (typeof text !== 'string') throw new CITError('json.validate() needs JSON text.');
+        try { JSON.parse(text); return true; } catch { return false; }
+      },
+      colorize: text => {
+        if (typeof text !== 'string') throw new CITError('json.colorize() needs JSON text.');
+        try {
+          const pretty = JSON.stringify(JSON.parse(text), null, 2);
+          if (process.env.NO_COLOR) return pretty;
+          return pretty.replace(/("(?:\\.|[^"\\])*")(\s*:)?|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|\b(?:true|false|null)\b/g, (token, string, colon) => {
+            const color = string ? (colon ? 36 : 32)
+              : token === 'null' ? 90 : token === 'true' || token === 'false' ? 35 : 33;
+            return `\x1b[${color}m${string || token}\x1b[0m${colon || ''}`;
+          });
+        } catch (cause) { throw new CITError(`json.colorize(): ${cause.message}`, tok.line, tok.column); }
+      },
+      merge: (left, right) => {
+        if (!(left instanceof Map) || !(right instanceof Map)) throw new CITError('json.merge() needs two objects parsed from JSON.');
+        return new Map([...left, ...right]);
+      },
+      query: (value, selector) => {
+        if (typeof selector !== 'string' || !selector.startsWith('$')) throw new CITError('json.query() path must start with $.');
+        const parts = selector.slice(1).match(/(?:\.([A-Za-z_][A-Za-z0-9_]*))|(?:\[(\d+)\])/g) || [];
+        if (parts.join('') !== selector.slice(1)) throw new CITError('json.query() supports only $.name and [index] path segments.');
+        let current = value;
+        for (const part of parts) {
+          if (part[0] === '.') current = current instanceof Map ? current.get(part.slice(1)) : current?.[part.slice(1)];
+          else current = Array.isArray(current) ? current[Number(part.slice(1, -1))] : undefined;
+        }
+        return current === undefined ? null : current;
       }
     };
     if (spec === 'time') {
@@ -2247,6 +2347,251 @@ async function run(source, output = () => {}, input = async prompt => '', option
         },
         strftime: (format, value) => formatTime(format, value === undefined ? new Date() : timeFromStruct(value)),
         strptime: (text, format) => parseTime(text, format, tok)
+      };
+    }
+    if (spec === 'cli') {
+      const requireList = (value, name) => {
+        if (!Array.isArray(value)) throw new CITError(`cli.${name}() needs a list.`, tok.line, tok.column);
+        return value;
+      };
+      return {
+        __module: 'cli',
+        select: async (items, prompt = 'Select an option:') => {
+          items = requireList(items, 'select');
+          items.forEach((item, index) => output(`${index + 1}) ${format(item)}`, 'out'));
+          const answer = Number(await input(`${prompt} `));
+          if (!Number.isInteger(answer) || answer < 1 || answer > items.length) throw new CITError('cli.select(): enter one of the displayed option numbers.', tok.line, tok.column);
+          return answer - 1;
+        },
+        table: rows => {
+          rows = requireList(rows, 'table');
+          if (!rows.every(Array.isArray)) throw new CITError('cli.table() needs a list of rows.', tok.line, tok.column);
+          const widths = [];
+          for (const row of rows) row.forEach((cell, index) => { widths[index] = Math.max(widths[index] || 0, format(cell).length); });
+          for (const row of rows) output(`| ${widths.map((width, index) => format(row[index] ?? '').padEnd(width)).join(' | ')} |`, 'out');
+          return null;
+        },
+        clear: () => { output('\x1b[2J\x1b[3J\x1b[H', 'print'); return null; },
+        cursor: (x, y) => {
+          if (!Number.isInteger(x) || !Number.isInteger(y) || x < 1 || y < 1) throw new CITError('cli.cursor() needs positive integer x and y coordinates.', tok.line, tok.column);
+          output(`\x1b[${y};${x}H`, 'print'); return null;
+        },
+        progress: value => {
+          if (typeof value !== 'number' || !Number.isFinite(value)) throw new CITError('cli.progress() needs a number from 0 to 100.', tok.line, tok.column);
+          const percentage = Math.max(0, Math.min(100, Math.round(value)));
+          output(`[${'#'.repeat(Math.floor(percentage / 5)).padEnd(20, '-')} ] ${percentage}%`, 'out');
+          return percentage;
+        },
+        confirm: async (prompt = 'Continue?') => /^(y|yes)$/i.test(String(await input(`${prompt} [y/N] `)).trim()),
+        password: async (prompt = 'Password:') => {
+          if (!options.supportsHiddenInput) throw new CITError('cli.password() requires a terminal that supports hidden input.', tok.line, tok.column);
+          return String(await input(`${prompt} `, { hidden: true }));
+        },
+        size: () => new Map([['columns', process.stdout.columns || 80], ['rows', process.stdout.rows || 24]]),
+        spinner: message => { output(`${format(message)}...`, 'out'); return null; },
+        checkbox: async items => {
+          items = requireList(items, 'checkbox');
+          items.forEach((item, index) => output(`${index + 1}) ${format(item)}`, 'out'));
+          const answer = String(await input('Select option numbers separated by commas:')).trim();
+          if (!answer) return [];
+          const indices = answer.split(',').map(value => Number(value.trim()) - 1);
+          if (!indices.every(index => Number.isInteger(index) && index >= 0 && index < items.length)) throw new CITError('cli.checkbox(): enter valid displayed option numbers.', tok.line, tok.column);
+          return [...new Set(indices)];
+        }
+      };
+    }
+    if (spec === 'sys') {
+      const os = require('node:os');
+      return {
+        __module: 'sys',
+        env: name => name === undefined ? { ...process.env } : process.env[String(name)] ?? null,
+        args: () => process.argv.slice(2),
+        exit: code => {
+          if (code === undefined) code = 0;
+          if (!Number.isInteger(code) || code < 0 || code > 255) throw new CITError('sys.exit() needs an exit code from 0 to 255.', tok.line, tok.column);
+          throw new CITExit(code);
+        },
+        platform: () => process.platform,
+        cwd: () => process.cwd(),
+        arch: () => process.arch,
+        pid: process.pid,
+        stdout: text => { process.stdout.write(String(text)); return null; },
+        stderr: text => { process.stderr.write(String(text)); return null; },
+        memory: () => process.memoryUsage(),
+        user: () => os.userInfo(),
+        beep: () => { output('\x07', 'print'); return null; },
+        uptime: () => process.uptime(),
+        clipRead: async () => {
+          if (typeof options.clipboard?.readText !== 'function') throw new CITError('sys.clipRead() is available only in the VS Code extension host.');
+          return options.clipboard.readText();
+        },
+        clipWrite: async text => {
+          if (typeof text !== 'string') throw new CITError('sys.clipWrite() needs a string.');
+          if (typeof options.clipboard?.writeText !== 'function') throw new CITError('sys.clipWrite() is available only in the VS Code extension host.');
+          await options.clipboard.writeText(text);
+          return null;
+        },
+        cpuInfo: () => os.cpus().map(({ model, speed }) => ({ model, speed })),
+        cpuLoad: () => os.loadavg(),
+        networkInterfaces: () => os.networkInterfaces(),
+        which: name => {
+          if (typeof name !== 'string' || !name || /[\\/]/.test(name)) throw new CITError('sys.which() needs a command name without a path.', tok.line, tok.column);
+          const extensions = process.platform === 'win32' ? (process.env.PATHEXT || '.EXE;.CMD;.BAT').split(';') : [''];
+          for (const directory of (process.env.PATH || '').split(path.delimiter)) {
+            for (const extension of extensions) {
+              const candidate = path.join(directory, name + extension);
+              try {
+                if (!fs.statSync(candidate).isFile()) continue;
+                if (process.platform !== 'win32') fs.accessSync(candidate, fs.constants.X_OK);
+                return candidate;
+              } catch {}
+            }
+          }
+          return null;
+        },
+        isAdmin: () => typeof process.getuid === 'function' ? process.getuid() === 0 : null
+      };
+    }
+    if (spec === 'datetime') {
+      const duration = unit => ({ ms: 1, s: 1000, m: 60000, h: 3600000, d: 86400000 }[unit]);
+      const cronValues = (field, min, max) => {
+        const allowed = new Set();
+        for (const part of field.split(',')) {
+          const [rangeText, stepText] = part.split('/');
+          const step = stepText === undefined ? 1 : Number(stepText);
+          if (!Number.isInteger(step) || step < 1) return null;
+          let start, end;
+          if (rangeText === '*') [start, end] = [min, max];
+          else if (/^\d+$/.test(rangeText)) {
+            start = Number(rangeText);
+            end = stepText === undefined ? start : max;
+          } else if (/^\d+-\d+$/.test(rangeText)) [start, end] = rangeText.split('-').map(Number);
+          else return null;
+          if (!Number.isInteger(start) || !Number.isInteger(end) || start < min || end > max || start > end) return null;
+          for (let item = start; item <= end; item += step) allowed.add(item);
+        }
+        return allowed;
+      };
+      const toDate = value => {
+        let date;
+        if (value === undefined) date = new Date();
+        else if (typeof value === 'number') date = new Date(value < 1e12 ? value * 1000 : value);
+        else if (value instanceof Date) date = new Date(value.getTime());
+        else if (typeof value === 'string') date = new Date(value);
+        else if (value && typeof value === 'object') date = timeFromStruct(value);
+        else throw new CITError('datetime expected a timestamp, date string or date structure.', tok.line, tok.column);
+        if (Number.isNaN(date.getTime())) throw new CITError('datetime received an invalid date or timestamp.', tok.line, tok.column);
+        return date;
+      };
+      return {
+        __module: 'datetime',
+        now: () => {
+          const date = new Date();
+          return { year: date.getFullYear(), month: date.getMonth() + 1, day: date.getDate(), hour: date.getHours(), minute: date.getMinutes(), second: date.getSeconds(), millisecond: date.getMilliseconds() };
+        },
+        timestamp: value => toDate(value).getTime() / 1000,
+        format: (value, pattern = '%Y-%m-%d %H:%M:%S') => {
+          const date = toDate(value);
+          return pattern.replace(/%([YymdHMSf%])/g, (_, code) => ({
+            Y: String(date.getFullYear()), y: String(date.getFullYear() % 100).padStart(2, '0'),
+            m: String(date.getMonth() + 1).padStart(2, '0'), d: String(date.getDate()).padStart(2, '0'),
+            H: String(date.getHours()).padStart(2, '0'), M: String(date.getMinutes()).padStart(2, '0'),
+            S: String(date.getSeconds()).padStart(2, '0'), f: String(date.getMilliseconds()).padStart(3, '0'), '%': '%'
+          })[code]);
+        },
+        wait: milliseconds => {
+          if (typeof milliseconds !== 'number' || !Number.isFinite(milliseconds) || milliseconds < 0) throw new CITError('datetime.wait() needs non-negative milliseconds.', tok.line, tok.column);
+          return new Promise(resolve => setTimeout(resolve, milliseconds));
+        },
+        ticker: async (milliseconds, count) => {
+          if (!Number.isFinite(milliseconds) || milliseconds < 0 || !Number.isInteger(count) || count < 0 || count > 10000) throw new CITError('datetime.ticker() needs a non-negative interval and a count from 0 to 10000.', tok.line, tok.column);
+          const ticks = [];
+          for (let index = 0; index < count; index++) { await new Promise(resolve => setTimeout(resolve, milliseconds)); ticks.push(Date.now()); }
+          return ticks;
+        },
+        add: (value, amount, unit = 'ms') => {
+          const scale = duration(unit);
+          if (!scale || typeof amount !== 'number' || !Number.isFinite(amount)) throw new CITError('datetime.add() needs an amount and a unit: ms, s, m, h or d.', tok.line, tok.column);
+          return new Date(toDate(value).getTime() + amount * scale).toISOString();
+        },
+        subtract: (value, amount, unit = 'ms') => {
+          const scale = duration(unit);
+          if (!scale || typeof amount !== 'number' || !Number.isFinite(amount)) throw new CITError('datetime.subtract() needs an amount and a unit: ms, s, m, h or d.', tok.line, tok.column);
+          return new Date(toDate(value).getTime() - amount * scale).toISOString();
+        },
+        diff: (left, right, unit = 'ms') => {
+          const scale = duration(unit);
+          if (!scale) throw new CITError('datetime.diff() unit must be ms, s, m, h or d.', tok.line, tok.column);
+          return (toDate(right).getTime() - toDate(left).getTime()) / scale;
+        },
+        benchmark: async callback => {
+          if (typeof callback !== 'function') throw new CITError('datetime.benchmark() needs a function.', tok.line, tok.column);
+          const start = process.hrtime.bigint();
+          const result = await callback();
+          return { result, durationMs: Number(process.hrtime.bigint() - start) / 1e6 };
+        },
+        cron: (expression, after) => {
+          if (typeof expression !== 'string') throw new CITError('datetime.cron() needs a five-field cron expression.', tok.line, tok.column);
+          const fields = expression.trim().split(/\s+/);
+          if (fields.length !== 5) throw new CITError('datetime.cron() expects minute hour day-of-month month day-of-week fields.', tok.line, tok.column);
+          const ranges = [[0, 59], [0, 23], [1, 31], [1, 12], [0, 7]];
+          const valueSets = fields.map((field, index) => {
+            const [min, max] = ranges[index];
+            return cronValues(field, min, max);
+          });
+          if (valueSets.some((values, index) => !values?.size)) throw new CITError('datetime.cron(): one or more cron fields are invalid.', tok.line, tok.column);
+          const start = toDate(after);
+          start.setSeconds(0, 0);
+          start.setMinutes(start.getMinutes() + 1);
+          const wildcardDay = fields[2] === '*', wildcardWeekday = fields[4] === '*';
+          for (let step = 0; step < 60 * 24 * 366 * 5; step++) {
+            const date = new Date(start.getTime() + step * 60000);
+            const weekday = date.getDay();
+            const dayMatches = valueSets[2].has(date.getDate());
+            const weekMatches = valueSets[4].has(weekday) || (weekday === 0 && valueSets[4].has(7));
+            if (valueSets[0].has(date.getMinutes())
+              && valueSets[1].has(date.getHours())
+              && valueSets[3].has(date.getMonth() + 1)
+              && (wildcardDay ? weekMatches : wildcardWeekday ? dayMatches : dayMatches || weekMatches)) return date.toISOString();
+          }
+          throw new CITError('datetime.cron(): no occurrence found within five years.', tok.line, tok.column);
+        }
+      };
+    }
+    if (spec === 'database') {
+      let DatabaseSync;
+      try { ({ DatabaseSync } = require('node:sqlite')); }
+      catch {
+        throw new CITError('SQLite support requires a Node.js runtime with node:sqlite (Node.js 22.5 or later).', tok.line, tok.column);
+      }
+      return {
+        __module: 'database',
+        connect: filename => {
+          if (typeof filename !== 'string' || !filename) throw new CITError('database.connect() needs a database filename.', tok.line, tok.column);
+          let connection;
+          try { connection = new DatabaseSync(filename === ':memory:' ? filename : path.resolve(currentDir || process.cwd(), filename)); }
+          catch (cause) { throw new CITError(`database.connect(): ${cause.message}`, tok.line, tok.column); }
+          const parameters = values => {
+            if (values === undefined) return [];
+            if (!Array.isArray(values)) throw new CITError('SQLite parameters must be supplied as a list.');
+            return values.map(value => value instanceof Map ? Object.fromEntries(value) : value);
+          };
+          return {
+            run: (sql, values) => {
+              if (typeof sql !== 'string') throw new CITError('SQLite SQL must be a string.');
+              try {
+                const result = connection.prepare(sql).run(...parameters(values));
+                return { changes: Number(result.changes), lastInsertRowid: Number(result.lastInsertRowid) };
+              } catch (cause) { throw new CITError(`SQLite run failed: ${cause.message}`); }
+            },
+            all: (sql, values) => {
+              if (typeof sql !== 'string') throw new CITError('SQLite SQL must be a string.');
+              try { return connection.prepare(sql).all(...parameters(values)).map(row => Object.fromEntries(Object.entries(row))); }
+              catch (cause) { throw new CITError(`SQLite query failed: ${cause.message}`); }
+            },
+            close: () => { connection.close(); return null; }
+          };
+        }
       };
     }
     if (typeof options.resolveModule !== 'function') throw new CITError('Imports are not available in this environment.', tok.line, tok.column);
@@ -2285,7 +2630,7 @@ async function run(source, output = () => {}, input = async prompt => '', option
 
   // Works out what an assignment target refers to (evaluating its parts once) and returns get/set helpers.
   async function resolveTarget(t, env, visibility = null) {
-    if (t.kind === 'variable') return { get: () => env.get(t.name, t.token), set: v => env.set(t.name, v, t.token) };
+    if (t.kind === 'variable') return { get: () => env.get(t.name, t.token), set: async v => await env.set(t.name, v, t.token) };
     if (t.kind === 'member') {
       if (t.optional) throw new CITError("A safe '?.' cannot be used on the left side of an assignment.", t.token.line, t.token.column);
       const o = await ev(t.object, env);
@@ -2343,7 +2688,7 @@ async function run(source, output = () => {}, input = async prompt => '', option
         const target = s.target.items[i];
         if (target) {
           if (target.kind !== 'variable') throw new CITError('Destructuring targets must be variable names.', s.token.line, s.token.column);
-          if (target.name !== '_') env.set(target.name, value[i], target.token);
+          if (target.name !== '_') await env.set(target.name, value[i], target.token);
         }
       }
       return;
@@ -2373,19 +2718,6 @@ async function run(source, output = () => {}, input = async prompt => '', option
       switch (s.kind) {
         case 'empty': case 'pass': break;
         case 'block': { const r = await exec(s.body, new Env(env)); if (r) return r; break; }
-        case 'styleRule': {
-          if (!collectingStyles) throw new CITError('Style selectors can only be used inside a style block.', s.token.line, s.token.column);
-          const properties = {};
-          for (const statement of s.body) {
-            if (statement.kind !== 'assign' || statement.target.kind !== 'variable' || statement.op !== '=') {
-              throw new CITError('Style blocks only support property assignments.', s.token.line, s.token.column);
-            }
-            const name = statement.target.name.replace(/^\$/, '');
-            properties[name] = await ev(statement.expr, env);
-          }
-          collectingStyles.push({ selector: s.selector, properties });
-          break;
-        }
         case 'with': {
           const resource = await ev(s.resource, env), scope = new Env(env);
           scope.define(s.name.value, resource, false, typeOf(resource), s.name);
@@ -2409,16 +2741,20 @@ async function run(source, output = () => {}, input = async prompt => '', option
           const declareName = (n, v, expr) => {
             if (v && v.kind === 'function' && !v.name && expr?.kind === 'lambda') v.name = n.value;
             if (n.value === '_') return;
-            const temporal = s.temporal ? {
-              unit: s.temporal.unit,
-              amount: s.temporal.amount,
-              mode: s.temporal.mode || null,
-              expiresAt: s.temporal.unit === 's' && s.temporal.mode !== 'offline' ? startedAt + s.temporal.amount * 1000 : null,
-              lastUsedAt: Date.now(),
-              remainingReads: s.temporal.unit === 'r' ? s.temporal.amount : null,
-              expiresLine: s.temporal.unit === 'l' ? n.line + s.temporal.amount : null,
-              isIdle: options.isUserIdle
-            } : null;
+            const temporal = s.temporal ? (() => {
+              const constraints = (s.temporal.constraints || [s.temporal]).map(constraint => ({
+                ...constraint,
+                expiresAt: constraint.unit === 's' && !['offline', 'stopUse'].includes(constraint.mode) ? startedAt + constraint.amount * 1000 : null,
+                remainingReads: constraint.unit === 'r' ? constraint.amount : null,
+                expiresLine: constraint.unit === 'l' ? n.line + constraint.amount : null
+              }));
+              return {
+                ...constraints[0],
+                constraints,
+                lastUsedAt: Date.now(),
+                isIdle: options.isUserIdle
+              };
+            })() : null;
             if (s.isStatic) {
               let root = env;
               while (root.parent) root = root.parent;
@@ -2431,6 +2767,7 @@ async function run(source, output = () => {}, input = async prompt => '', option
               env.values.set(n.value, binding);
             } else {
               const binding = env.define(n.value, v, s.mutable, typeOf(v), n, temporal);
+              binding.reactive = Boolean(s.reactive);
               if (s.visibility && env.instance) {
                 env.instance[n.value] = v;
                 let fields = FIELD_ACCESS.get(env.instance);
@@ -2446,6 +2783,17 @@ async function run(source, output = () => {}, input = async prompt => '', option
           } else s.names.forEach((n, i) => {
             const valueIndex = unpacked ? i : s.broadcast ? 0 : i;
             declareName(n, s.exprs ? (unpacked ? unpacked[i] : values[valueIndex]) : null, s.exprs?.[valueIndex]);
+          });
+          break;
+        }
+        case 'watch': {
+          const binding = env.binding(s.name.value);
+          if (!binding) throw new CITError(`Undefined variable '${s.name.value}'.`, s.name.line, s.name.column);
+          if (!binding.reactive) throw new CITError(`'${s.name.value}' must be declared with 'reactive let mut' before it can be watched.`, s.name.line, s.name.column);
+          binding.watchers ||= [];
+          binding.watchers.push(async () => {
+            const result = await exec(s.body, new Env(env));
+            if (result && result.type !== RETURN) throw new CITError('A watch block cannot break or continue.');
           });
           break;
         }
@@ -2466,13 +2814,7 @@ async function run(source, output = () => {}, input = async prompt => '', option
         case 'expr': await ev(s.expr, env); break;
         case 'function':
           {
-            let fn = { kind: 'function', name: s.name, params: s.params, body: s.body, uiTitle: s.uiTitle, styleTitle: s.styleTitle, closure: env, staticId: `function-${nextFunctionId++}` };
-            if (s.styleTitle) {
-              const title = await ev(s.styleTitle, env);
-              if (typeof title !== 'string') throw new CITError('style.title must be a string.', s.token.line, s.token.column);
-              fn.styleTitle = title;
-              styleDefinitions.set(title, fn);
-            }
+            let fn = { kind: 'function', name: s.name, params: s.params, body: s.body, closure: env, staticId: `function-${nextFunctionId++}` };
             for (const decorator of (s.decorators || []).reverse()) {
               const target = await ev(decorator, env);
               fn = await callValue(target, [{ name: null, value: fn }], env, 'decorator', s.token);
@@ -2502,18 +2844,20 @@ async function run(source, output = () => {}, input = async prompt => '', option
             if (!parent || parent.kind !== 'class') throw new CITError(`'${s.parent.value}' is not a class, so it cannot be a parent class.`, s.parent.line, s.parent.column);
             if (parent.final) throw new CITError(`Cannot inherit from final class '${parent.name}'.`, s.parent.line, s.parent.column);
           }
-          const methods = {}, fields = {}, getters = {}, setters = {};
+          const methods = {}, fields = {}, getters = {}, setters = {}, operators = {};
           for (const m of s.body) {
             if (m.kind === 'function') {
               const fn = { kind: 'function', name: m.name, params: m.params, body: m.body, closure: null, accessor: m.accessor, staticId: `method-${nextFunctionId++}` };
               if (m.accessor === 'get') getters[m.name] = fn;
               else if (m.accessor === 'set') setters[m.name] = fn;
               else methods[m.name] = fn;
+            } else if (m.kind === 'operator') {
+              operators[m.operator] = { kind: 'function', name: `operator ${m.operator}`, params: m.params, body: m.body, closure: null, staticId: `operator-${nextFunctionId++}` };
             } else if (m.kind === 'declare' && m.names.length === 1 && m.exprs?.length === 1) {
               fields[m.names[0].value] = { expr: m.exprs[0], mutable: m.mutable, visibility: m.visibility || null, token: m.names[0] };
             } else throw new CITError('A class can contain methods and initialized fields only.', s.token.line, s.token.column);
           }
-          env.define(s.name, { kind: 'class', name: s.name, methods, getters, setters, fields, parent, final: s.final }, false, 'class', s.token);
+          env.define(s.name, { kind: 'class', name: s.name, methods, getters, setters, fields, operators, parent, final: s.final }, false, 'class', s.token);
           break;
         }
         case 'if': {
@@ -2672,7 +3016,11 @@ async function run(source, output = () => {}, input = async prompt => '', option
     return null;
   }
 
-  await withDefers(global, () => exec(ast, global));
+  try { await withDefers(global, () => exec(ast, global)); }
+  catch (error) {
+    if (!(error instanceof CITExit)) throw error;
+    global.exitCode = error.code;
+  }
   return global;
 }
 

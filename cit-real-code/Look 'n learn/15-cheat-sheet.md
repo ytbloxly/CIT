@@ -147,7 +147,7 @@ import math
 println(math.sqrt(16), math.pi)
 ```
 
-Classes also support `private` / `protected` fields and `@decorator` functions. `raise`, typed `except` clauses and `finally` are available. See chapters 16–20 for UI rendering, UTF-8 file I/O, enums and `cit --open trm`.
+Classes also support `private` / `protected` fields, overloaded binary operators and `@decorator` functions. `raise`, typed `except` clauses and `finally` are available. See chapters 16–20 for collections, math, terminal tools, UTF-8 file I/O, enums and `cit --open trm`.
 
 ## Modules ([13](13-modules-and-ipcit.md))
 

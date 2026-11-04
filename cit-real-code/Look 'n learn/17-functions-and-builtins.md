@@ -64,4 +64,4 @@ Output:
 
 `task.wait(seconds)` pauses the program for the given number of seconds.
 
-Previous: [16. Tuples, sets and math](16-collections-and-math.md) | Next: [18. UI and text files](18-ui-and-files.md)
+Previous: [16. Tuples, sets and math](16-collections-and-math.md) | Next: [18. Terminal tools and text files](18-terminal-tools-and-files.md)

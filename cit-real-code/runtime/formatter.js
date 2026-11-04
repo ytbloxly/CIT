@@ -20,10 +20,10 @@ const { tokenize } = require('./standalone');
 const NON_OPERAND_WORDS = new Set([
   'return', 'case', 'in', 'defer', 'throw', 'else', 'do', 'try', 'let', 'mut', 'import', 'as',
   'if', 'elseif', 'while', 'for', 'switch', 'catch', 'except', 'finally', 'raise', 'with',
-  'enum', 'private', 'protected', 'fn', 'class'
+  'enum', 'private', 'protected', 'fn', 'class', 'async', 'await', 'reactive', 'watch', 'operator', 'after'
 ]);
 const CONTROL_BEFORE_PAREN = new Set(['if', 'elseif', 'while', 'for', 'switch', 'catch', 'except', 'return', 'case', 'in', 'defer', 'throw', 'raise']);
-const TWO_CHAR_OPS = ['==', '!=', '<=', '>=', '&&', '||', '**', '//', '+=', '-=', '*=', '/=', '%=', '++', '--', '=>'];
+const TWO_CHAR_OPS = ['==', '!=', '<=', '>=', '&&', '||', '??', '**', '//', '+=', '-=', '*=', '/=', '%=', '++', '--', '=>'];
 
 class FormatError extends Error {}
 

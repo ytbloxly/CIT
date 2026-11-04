@@ -47,11 +47,11 @@ class CitTerminal {
   writeLine(text, kind = 'out') { this.write(paint(kind, String(text).replace(/\r?\n/g, '\r\n')) + '\r\n'); }
 
   // Prints the prompt, then waits for a line typed into the terminal.
-  readLine(prompt = '') {
+  readLine(prompt = '', { hidden = false } = {}) {
     if (this.cancelled || this.closed) return Promise.reject(CANCEL);
     this.write(prompt);
     this.buffer = '';
-    return new Promise((resolve, reject) => { this.pending = { resolve, reject }; });
+    return new Promise((resolve, reject) => { this.pending = { resolve, reject, echo: !hidden }; });
   }
 
   handleInput(data) {
@@ -64,9 +64,13 @@ class CitTerminal {
         this.pending = null; this.buffer = '';
         this.write('\r\n'); p.resolve(line);
       } else if (ch === '\x7f' || ch === '\b') {
-        if (this.buffer.length) { this.buffer = [...this.buffer].slice(0, -1).join(''); this.write('\b \b'); }
+        if (this.buffer.length) {
+          this.buffer = [...this.buffer].slice(0, -1).join('');
+          if (this.pending.echo) this.write('\b \b');
+        }
       } else if (ch >= ' ') {
-        this.buffer += ch; this.write(ch);
+        this.buffer += ch;
+        if (this.pending.echo) this.write(ch);
       }
     }
   }
@@ -189,15 +193,17 @@ function activate(context) {
           (line, kind) => kind === 'print'
             ? term.write(String(line).replace(/\r?\n/g, '\r\n'))
             : term.writeLine(line, kind),   // kind: out | warn | error -> own color
-          prompt => term.readLine(prompt),               // input() is typed in the terminal
+          (prompt, inputOptions) => term.readLine(prompt, inputOptions), // input() is typed in the terminal
           {
             baseDir: fsPath ? path.dirname(fsPath) : (vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? null),
             resolveModule: ipcit.resolveModule,
-            renderUI: (tree, title, styles) => renderCITUI(tree, title, styles),
             isUserIdle: () => windowIdleSince !== null,
-            windowPrompt: async message => (await vscode.window.showInputBox({ prompt: message })) ?? null,
-            windowAlert: message => vscode.window.showInformationMessage(message),
-            isCancelled: () => term.cancelled
+            isCancelled: () => term.cancelled,
+            supportsHiddenInput: true,
+            clipboard: {
+              readText: () => vscode.env.clipboard.readText(),
+              writeText: text => vscode.env.clipboard.writeText(text)
+            }
           }
         );
         term.writeLine('\n[CIT] Finished successfully (bundled CIT VM).', 'ok');
@@ -275,20 +281,26 @@ const CIT_HOVER = {
   const: 'Declares a constant value that cannot be reassigned.',
   static: 'Declares a static value that is stored per function or class scope.',
   fn: 'Declares a function: `fn name(parameters) { ... }`.',
+  async: 'Declares an async function. Use `await` inside it to wait for asynchronous work.',
+  await: 'Waits for an asynchronous result; valid inside an `async fn`.',
+  reactive: 'Marks a mutable variable for notifications from `watch` blocks.',
+  watch: 'Runs a block whenever a reactive variable changes.',
+  operator: 'Defines an overloaded binary operator inside a class.',
   class: 'Declares a class. A parent can be written as `class Child(Parent())`.',
   for: 'Loops support `for (let item in values)` and `for (let i, range(0, 10))`.',
-  import: 'Imports a local CIT module, an ipcit package, or built-in `math` / `ui` modules.',
+  import: 'Imports a local CIT module, an ipcit package, or a built-in module such as `math`, `cli`, or `database`.',
   temporal: 'Temporal lifetime suffixes are `<Nr>` (reads), `<Ns>` (seconds), or `<Nl>` (source lines). Seconds also support `offline` and `stopUse` modes.',
   tuple: 'Creates an immutable ordered tuple.',
-  set: 'Creates a unique-value set.',
+  set: 'Creates a unique-value set with `set(...)`, or declares a property setter with `set fn property(value) { ... }`.',
   guard: 'Runs an `else` block and exits early when its condition is false.',
   get: 'Declares a class property getter with `get fn property() { ... }`.',
-  set: 'Declares a class property setter with `set fn property(value) { ... }`.',
   final: 'Prevents a class from being subclassed.',
-  json: 'Built-in JSON module: `json.dumps`, `json.loads`, `json.dump`, and `json.load`.',
+  json: 'Built-in JSON module for parsing, serialization, validation, querying, merging and file I/O.',
   time: 'Built-in time module for timestamps, local/UTC time values, and formatting.',
-  ui: 'Built-in UI module for building HTML-style elements rendered in a VS Code webview.',
-  'ui-style': 'Built-in UI styling module. Connect a named style from a UI app function.',
+  cli: 'Built-in module for terminal menus, hidden password prompts, tables, progress, and terminal control.',
+  sys: 'Built-in system and clipboard helpers. `sys.exit()` stops the CIT program; process execution and termination are unavailable.',
+  datetime: 'Built-in date/time utilities, cron calculation and benchmarking helpers.',
+  database: 'Built-in SQLite module. Use `database.connect(path)` and parameterized `db.run` / `db.all` calls.',
   longString: 'Converts a value to text. Strings are unbounded unless an `sN` width is explicitly declared.',
   longNumber: 'Converts a number or numeric string to the runtime number type; it is not arbitrary precision.',
   printf: 'Prints a `%s`, `%d`, `%i`, `%f` formatted string.',
@@ -304,48 +316,6 @@ const CIT_HOVER = {
 };
 
 function escapeRegExp(value) { return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
-
-function renderCITUI(tree, title, styles = []) {
-  const panel = vscode.window.createWebviewPanel('cit.preview', title || 'CIT App', vscode.ViewColumn.Beside, {
-    enableScripts: false,
-    localResourceRoots: []
-  });
-  const allowed = new Set(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'p', 'button', 'div', 'select', 'option', 'input', 'section']);
-  const voidTags = new Set(['input']);
-  const lengthProperties = new Set(['padding', 'margin', 'fontSize', 'height', 'width', 'top', 'bottom', 'left', 'right', 'borderRadius', 'lineHeight', 'letterSpacing', 'wordSpacing']);
-  const escapeHTML = value => String(value).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
-  const css = styles.map(rule => {
-    if (typeof rule.selector !== 'string' || !/^[A-Za-z0-9_.*# ,>:+-]+$/.test(rule.selector)) return '';
-    const declarations = Object.entries(rule.properties).flatMap(([name, value]) => {
-      if (!/^[A-Za-z][A-Za-z0-9]*$/.test(name) || value === null || value === undefined) return [];
-      let text = String(value);
-      if (typeof value === 'number' && lengthProperties.has(name) && value !== 0) text += 'px';
-      if (/[{}<>]|url\s*\(/i.test(text)) return [];
-      const property = name.replace(/[A-Z]/g, ch => `-${ch.toLowerCase()}`);
-      return [`${property}:${text}`];
-    });
-    return declarations.length ? `${rule.selector}{${declarations.join(';')}}` : '';
-  }).join('\n');
-  const render = value => {
-    if (Array.isArray(value)) return value.map(render).join('');
-    if (value && value.__ui) {
-      const tag = value.tag === 'title' ? 'h1' : value.tag === 'tile' ? 'section' : value.tag === 'slider' ? 'input' : value.tag;
-      if (!allowed.has(tag)) return '';
-      const attrs = { ...value.attrs };
-      if (value.tag === 'slider') attrs.type = 'range';
-      const renderedAttrs = Object.entries(attrs).flatMap(([name, attribute]) => {
-        if (!/^[A-Za-z_:][A-Za-z0-9_:.-]*$/.test(name) || /^on/i.test(name) || attribute === false || attribute === null || attribute === undefined) return [];
-        if (name === 'href' && /^\s*javascript:/i.test(String(attribute))) return [];
-        return [attribute === true ? ` ${name}=""` : ` ${name}="${escapeHTML(attribute)}"`];
-      }).join('');
-      const children = value.children.map(render).join('');
-      return voidTags.has(tag) ? `<${tag}${renderedAttrs}>` : `<${tag}${renderedAttrs}>${children}</${tag}>`;
-    }
-    return escapeHTML(value === null || value === undefined ? '' : value);
-  };
-  panel.webview.html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><title>${escapeHTML(title || 'CIT App')}</title><style>body{font:16px/1.6 system-ui,sans-serif;max-width:760px;margin:48px auto;padding:0 24px;color:#24292f;background:#fff}h1,h2,h3,h4,h5,h6,header{line-height:1.2;color:#111827}p{margin:1em 0}button,input,select{font:inherit}button{padding:.5em 1em;cursor:pointer}${css}</style></head><body>${render(tree)}</body></html>`;
-  return null;
-}
 
 function projectDir() {
   const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;

@@ -1,6 +1,6 @@
 # CIT v0.6 feature showcase
 
-for (let i, range = 0, 5) {
+for (let i, range(0, 5)) {
     println(i)
 }
 

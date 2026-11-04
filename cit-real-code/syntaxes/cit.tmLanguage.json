@@ -195,7 +195,7 @@
         },
         {
           "name": "storage.type",
-          "match": "\\b(let|class|const|static)\\b"
+          "match": "\\b(let|class|const|static|reactive)\\b"
         }
       ]
     },
@@ -233,7 +233,7 @@
       "patterns": [
         {
           "name": "keyword.control",
-          "match": "\\b(if|elseif|else|while|do|switch|case|in|try|catch|except|finally|throw|raise|defer|for|range|return|break|continue|pass|import|as|with|enum|private|protected|public|final|get|set|guard)\\b"
+          "match": "\\b(if|elseif|else|while|do|switch|case|in|try|catch|except|finally|throw|raise|defer|for|range|return|break|continue|pass|import|as|with|enum|private|protected|public|final|get|set|guard|async|await|watch|operator|after)\\b"
         }
       ]
     },
@@ -278,6 +278,10 @@
         {
           "name": "keyword.operator.comparison",
           "match": "==|!=|<=|>=|<|>"
+        },
+        {
+          "name": "keyword.operator.null-coalescing",
+          "match": "\\?\\?"
         },
         {
           "name": "keyword.operator.logical",

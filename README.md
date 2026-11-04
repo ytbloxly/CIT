@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-1.0.0-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-1.0.1-blue">
   <img alt="Files" src="https://img.shields.io/badge/files-.cit%20%7C%20.ct-informational">
   <img alt="Editor" src="https://img.shields.io/badge/editor-VS%20Code-007ACC">
 </p>
@@ -165,7 +165,9 @@ println(castInt("42"))
 - **Modules and values**: `import name from module`, built-in `json` and `time` modules, fixed-width declarations (`i8`-`i64`, `f8`-`f64`, `s8`-`s64`, `b8`/`b16`), and `longString` / `longNumber`.
 - **Sets and tuples**: mutable set operations and immutable tuples, alongside constructors such as `list()`, `tuple()`, `set()`, `dict()`, `frozendict()` and `frozenset()`.
 - **Errors and files**: `raise`, typed `except`, `finally`, UTF-8 `open()` with write/append/read, and `printf`, `exchange`, `task.wait`, `zip`, `enumerate`, `type`, `round`, `id`, `isinstance`, `issubclass`, `bin`, `square`.
-- **UI** with `import ui` and HTML-style elements rendered in a VS Code webview, plus `ui-style` CSS-like styling.
+- **CIT 1 Gen/Update 1**: `??`, temporal limit chaining, `*args` / `**kwargs`, async functions, custom binary operators, generic type-argument syntax and reactive `watch` blocks.
+- **Standard modules**: statistics in `math`; parse/stringify/query and file helpers in `json`; terminal helpers (including hidden password input in the VS Code runner) in `cli`; date/time helpers in `datetime`; system information, program-scoped exit and VS Code clipboard access in `sys`; and SQLite through parameterized queries.
+- HTML UI rendering and `window.prompt` / `window.alert` were removed in Update 1. Process execution and termination APIs (`sys.exec`, `sys.run`, `sys.kill`) are not exposed.
 - **Editor support**: CIT syntax coloring, snippets, formatting, hover help and Go to Definition (`F12` / `Ctrl+Click`).
 - Comments with `#` and `/* ... */`, and modules with `import "name"` / `import "name" as alias`.
 - **Tools**: compile-before-run, **Format Document**, colored output, typed input in the terminal, snippets and the `ipcit` package manager.
@@ -184,7 +186,7 @@ let copy = nums.copy() # an independent copy
 nums.clear()           # []
 ```
 
-### CIT 1 Gen highlights
+### CIT 1 Gen/Update 1 highlights
 
 Temporal variables can expire by number of reads (`r`), seconds (`s`) or source lines (`l`):
 
@@ -197,7 +199,7 @@ let mut inactiveValue <5s = stopUse> = "expires after five seconds of VS Code in
 
 `stopUse` uses VS Code window activity and has no activity signal in the standalone CLI. `longNumber` uses JavaScript numeric precision; it does not represent arbitrary-precision integers. Fixed-width numeric and string declarations validate their documented storage limits.
 
-The class and UI systems include access-controlled fields, properties, inheritance, and a sanitized HTML-style preview:
+Classes include access-controlled fields, properties and inheritance:
 
 ```cit
 class Account() {
@@ -205,17 +207,6 @@ class Account() {
     get fn credit() { return self.balance }
     set fn credit(value) { if (value >= 0) { self.balance = value } }
 }
-
-import ui
-import ui-style
-fn app(ui.title = "My CIT app") {
-    style.connect("page")
-    return [ui.h1("Hello"), ui.p("Rendered in a VS Code webview")]
-}
-fn page(style.title = "page") {
-    return [body { backgroundColor = "#f4f4f4" }]
-}
-app().render()
 ```
 
 `pop()` takes the last item (or `pop(i)` for item `i`). `remove(x)` and `index(x)` stop with an error if `x` is not in the list. Without `mut`, a list can be read but not changed.
@@ -376,14 +367,14 @@ Good to know:
 
 ### Learn CIT
 
-- The **`Look 'n learn`** folder is a 20-chapter guide that explains the language and new features, with examples you can run. In VS Code, run **CIT: Open Look 'n learn (Docs)** from the Command Palette.
+- The **`Look 'n learn`** folder is a 21-chapter guide that explains the language and new features, with examples you can run. In VS Code, run **CIT: Open Look 'n learn (Docs)** from the Command Palette.
 - The **`examples`** folder has one runnable program for each chapter, plus a guessing game and a mini project.
 
 ### Install the VS Code extension
 
 1. Open VS Code and go to Extensions (`Ctrl+Shift+X`).
 2. Click the `...` menu and choose **Install from VSIX...**.
-3. Select `cit-language-1.0.0.vsix`.
+3. Select `cit-language-1.0.1.vsix`.
 4. Open any `.cit` or `.ct` file. VS Code selects CIT automatically.
 5. Run it with the Play button in the editor, the right-click menu, or `Ctrl+F5`.
 
@@ -431,14 +422,14 @@ println(mp.hello())
 
 ```
 .
-├── extension.js        # VS Code extension (terminal runner, UI preview, ipcit terminal)
+├── extension.js        # VS Code extension (terminal runner, ipcit terminal)
 ├── runtime/            # Compiler/interpreter, formatter, ipcit and terminal colors
 ├── bin/                # cit and ipcit command-line tools
 ├── registry/           # ipcit package registry (packages will be added here)
 ├── syntaxes/           # Syntax highlighting
 ├── snippets/           # Code snippets
 ├── examples/           # One runnable .cit program per chapter (01-hello-world.cit ... 15-mini-project.cit)
-└── Look 'n learn/      # The guide: 20 chapters that explain the whole language
+└── Look 'n learn/      # The guide: 21 chapters that explain the whole language
 ```
 
 ---
@@ -591,7 +582,9 @@ println(castInt("42"))
 - **Matemáticas**: `import math` incluye redondeo, raíces, logaritmos, trigonometría, factorial, gcd/lcm y constantes (`pi`, `e`, `tau`, `nan`, `inf`).
 - **Módulos y valores**: `import nombre from modulo`, módulos integrados `json` y `time`, declaraciones de ancho fijo (`i8`-`i64`, `f8`-`f64`, `s8`-`s64`, `b8`/`b16`), y `longString` / `longNumber`.
 - **Archivos y utilidades**: `open()` para leer/escribir UTF-8, `printf`, `exchange`, `task.wait`, `zip`, `enumerate`, `type`, `round`, `id`, `isinstance`, `issubclass`, `bin` y `square`.
-- **Interfaz** con `import ui`, elementos HTML renderizados en un webview de VS Code y estilos CSS-like con `ui-style`.
+- **CIT 1 Gen/Update 1**: `??`, límites temporales encadenados, `*args` / `**kwargs`, funciones async, operadores binarios personalizados, sintaxis genérica y bloques reactivos `watch`.
+- **Módulos integrados**: estadísticas en `math`; parse/stringify/query y archivos en `json`; herramientas de terminal (incluida la entrada oculta de contraseñas en el ejecutor de VS Code) en `cli`; fechas en `datetime`; información del sistema, salida limitada al programa y acceso al portapapeles de VS Code en `sys`; y SQLite con consultas parametrizadas.
+- En Update 1 se eliminaron la interfaz HTML y `window.prompt` / `window.alert`. No se exponen APIs para ejecutar procesos ni terminarlos (`sys.exec`, `sys.run`, `sys.kill`).
 - **Editor**: resaltado de CIT, snippets, formateador, ayuda al pasar el cursor y Go to Definition (`F12` / `Ctrl+Click`).
 - Comentarios con `#` y `/* ... */`, y módulos con `import "nombre"` / `import "nombre" as alias`.
 - **Herramientas**: compilación antes de ejecutar, **Formatear documento**, salida en color, entrada escrita en la terminal, fragmentos de código (snippets) y el gestor de paquetes `ipcit`.
@@ -610,7 +603,7 @@ let copy = nums.copy() # una copia independiente
 nums.clear()           # []
 ```
 
-### Funciones destacadas de CIT 1 Gen
+### Funciones destacadas de CIT 1 Gen/Update 1
 
 Las variables temporales admiten límites por lecturas (`r`), segundos (`s`) y líneas de código (`l`):
 
@@ -623,7 +616,7 @@ let mut inactiveValue <5s = stopUse> = "caduca tras cinco segundos de inactivida
 
 `stopUse` utiliza la actividad de la ventana de VS Code; la CLI independiente no dispone de esa señal. `longNumber` usa la precisión numérica de JavaScript y no representa enteros de precisión arbitraria. Las declaraciones de ancho fijo validan sus límites de almacenamiento.
 
-Las clases admiten campos con acceso controlado, propiedades y herencia; la interfaz se muestra en una vista previa HTML segura:
+Las clases admiten campos con acceso controlado, propiedades y herencia:
 
 ```cit
 class Account() {
@@ -631,17 +624,6 @@ class Account() {
     get fn credit() { return self.balance }
     set fn credit(value) { if (value >= 0) { self.balance = value } }
 }
-
-import ui
-import ui-style
-fn app(ui.title = "Mi app CIT") {
-    style.connect("page")
-    return [ui.h1("Hola"), ui.p("Se muestra en un webview de VS Code")]
-}
-fn page(style.title = "page") {
-    return [body { backgroundColor = "#f4f4f4" }]
-}
-app().render()
 ```
 
 `pop()` quita el último elemento (o `pop(i)` el elemento `i`). `remove(x)` e `index(x)` se detienen con un error si `x` no está en la lista. Sin `mut`, una lista se puede leer pero no modificar.
@@ -802,14 +784,14 @@ Conviene saber:
 
 ### Aprende CIT
 
-- La carpeta **`Look 'n learn`** es una guía de 20 capítulos sobre el lenguaje y sus nuevas funciones, con ejemplos que puedes ejecutar. En VS Code, ejecuta **CIT: Open Look 'n learn (Docs)** desde la paleta de comandos.
+- La carpeta **`Look 'n learn`** es una guía de 21 capítulos sobre el lenguaje y sus nuevas funciones, con ejemplos que puedes ejecutar. En VS Code, ejecuta **CIT: Open Look 'n learn (Docs)** desde la paleta de comandos.
 - La carpeta **`examples`** tiene un programa ejecutable por cada capítulo, además de un juego de adivinar el número y un miniproyecto.
 
 ### Instalar la extensión de VS Code
 
 1. Abre VS Code y ve a Extensiones (`Ctrl+Shift+X`).
 2. Haz clic en el menú `...` y elige **Instalar desde VSIX...**.
-3. Selecciona `cit-language-1.0.0.vsix`.
+3. Selecciona `cit-language-1.0.1.vsix`.
 4. Abre cualquier archivo `.cit` o `.ct`. VS Code selecciona CIT automáticamente.
 5. Ejecútalo con el botón Play del editor, el menú contextual o `Ctrl+F5`.
 
@@ -864,7 +846,7 @@ println(mp.hello())
 ├── syntaxes/           # Resaltado de sintaxis
 ├── snippets/           # Fragmentos de código
 ├── examples/           # Un programa .cit ejecutable por capítulo (01-hello-world.cit ... 15-mini-project.cit)
-└── Look 'n learn/      # La guía: 20 capítulos que explican todo el lenguaje
+└── Look 'n learn/      # La guía: 21 capítulos que explican todo el lenguaje
 ```
 
 <p align="center"><sub>Made with ♥ · Hecho con ♥</sub></p>
